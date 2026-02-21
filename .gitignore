@@ -8,3 +8,4 @@
 logs/
 FLAT.xml
 **/package-lock.json
+.vscode/settings.json

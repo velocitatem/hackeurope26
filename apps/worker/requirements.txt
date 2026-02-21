@@ -1,13 +1,32 @@
+# Core - always installed
+python-dotenv
 requests
-streamlit
+tqdm
+
+# Logging (lib)
+python-logging-loki
+
+# Backend (fastapi or flask)
 fastapi
 flask
-tqdm
-uvicorn
-torch
-seleniumbase
-pyspark
 flask-cors
-python-logging-loki
-python-dotenv
+uvicorn[standard]
+pydantic
+
+# Worker (Celery + Redis)
+celery[redis]
+redis
+
+# Scraper (lib)
+seleniumbase
+beautifulsoup4
+
+# Minimal webapp
+streamlit
+
+# AI / Agent SDK
+anthropic
+
+# ML (heavy - comment out if not needed)
+torch
 tensorboard
