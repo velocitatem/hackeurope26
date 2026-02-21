@@ -11,3 +11,5 @@ FLAT.xml
 .vscode/settings.json
 .DS_Store
 ml/data/weather-data/country_dfs
+
+ml/data/uk/uk-data
