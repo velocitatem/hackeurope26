@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rails-control-plane
+  labels:
+    app: rails-control-plane
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rails-control-plane
+  template:
+    metadata:
+      labels:
+        app: rails-control-plane
+    spec:
+      containers:
+        - name: rails
+          image: quay.io/drosel_ieu2022/hackeurope:rails-hook-v8
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3001
+          env:
+            - name: RAILS_ENV
+              value: development
+            - name: DATABASE_URL
+              value: postgresql://postgres:postgres@postgres:5432/app
+            - name: ML_INFERENCE_URL
+              value: http://ml-inference:8000
+            - name: SCHED_HOOK_ROOT
+              value: /opt/hackeurope
+            - name: SCHED_HOOK_PYTHON
+              value: python3
+            - name: SCHED_HOOK_TIMEOUT_S
+              value: "30"
+          command:
+            - bash
+            - -lc
+          args:
+            - rm -f /app/tmp/pids/server.pid && bundle exec rails db:prepare && bundle exec rails db:seed && bundle exec rails server -b 0.0.0.0 -p 3001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rails-control-plane
+  labels:
+    app: rails-control-plane
+spec:
+  selector:
+    app: rails-control-plane
+  ports:
+    - name: http
+      port: 3001
+      targetPort: 3001
