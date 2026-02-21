@@ -1,7 +1,7 @@
 # Makefile - Ultiplate Template
 .PHONY: help init bootstrap venv deps envlink fmt lint type test clean doctor
 .PHONY: up down logs ps rebuild
-.PHONY: dev run.webapp run.webapp.simple run.backend run.worker run.ml
+.PHONY: dev run.webapp run.webapp.simple run.backend run.worker run.ml run.scheduler
 .PHONY: lift lift.minio lift.tensorboard lift.logging lift.database
 .PHONY: etl train infer seed
 .PHONY: ai.plan ai.build ai.review ai.agent
@@ -140,6 +140,9 @@ run.worker: ## Start Celery worker (requires redis)
 
 run.ml: ## Start ML inference server (FastAPI)
 	@cd ml && uvicorn inference:app --host 0.0.0.0 --port 8000 --reload
+
+run.scheduler: ## Start the adaptive scheduler demo loop
+	@$(PYTHON) -m src.main
 
 ## ── ML Workflow ──────────────────────────────────────────────────────────────
 

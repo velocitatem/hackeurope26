@@ -1,48 +1,70 @@
+import time
+
 from lib import get_logger
-import random
-import numpy as np
 
-GEOGRAPHIES = ["FR", "DE", "ES"]
-PROVIDERS = ["AWS", "Azure", "GCP"]
-FREQ = 60 * 30 # 30 minutes
-HORIZON = 60 * 60 * 24 # 24 hours
-
-
-def get_detlta(GEO : str):
-    # TODO: we create a model for each geography that predicts the delta
-    # the delta is the production - demand of energy in that geography which we use as a heuristic to decide where to run the workloads
-    # once we have the models they will be deployed on a server and we can infer on them.
-    offsets = [0.5, 0, -0.5]
-    offset = offsets[GEOGRAPHIES.index(GEO)]
-    return np.sin(random.random() * 2 * np.pi + offset) + random.random() * 0.1
-
-class Node:
-    def __init__(self, parent : Node|None):
-        self.deltas = {K: get_detlta(K) for K in GEOGRAPHIES}
-        self.parent = parent
+from src import config
+from src.migration import MigrationManager
+from src.models import JobSpec
+from src.scheduler import Scheduler
+from src.signals import EnergyClient, InventoryClient
 
 
-
-
-def main():
+def main() -> None:
     logger = get_logger("scheduler", level="DEBUG")
+    migration = MigrationManager()
 
-    root = Node(None)
-    for t in range(0, HORIZON, FREQ):
-        logger.info(f"Time: {t}")
-        node = Node(root)
-        logger.debug(f"Deltas: {node.deltas}")
-        root = node
+    scheduler = Scheduler(
+        energy=EnergyClient(),
+        inventory=InventoryClient(),
+        dispatch_callback=migration.dispatch,
+        warm_start_callback=migration.warm_start_target,
+    )
 
-    # best path of geographies with highest delta at each step
-    path = []
-    node = root
-    while node is not None:
-        best_geo = max(node.deltas, key=node.deltas.get)
-        path.append(best_geo)
-        node = node.parent
-    logger.info(f"Best path: {path}")
+    job = JobSpec(
+        job_id="demo-train-001",
+        duration_s=6 * 60 * 60,
+        gpu_count=1,
+        min_gpu_memory_mib=16 * 1024,
+        allowed_geos=config.GEOGRAPHIES,
+    )
 
+    decision = scheduler.schedule(job)
+    logger.info(
+        "Initial placement job=%s geo=%s region=%s provider=%s sku=%s window=[%s,%s] avg_delta=%.3f score=%.3f",
+        decision.job_id,
+        decision.geo,
+        decision.region,
+        decision.provider,
+        decision.sku,
+        int(decision.start_ts),
+        int(decision.end_ts),
+        decision.avg_delta,
+        decision.score,
+    )
+
+    last_migration_ts = None
+    for epoch in range(1, 31):
+        job.current_epoch = epoch
+        candidate = scheduler.evaluate_migration(
+            job=job,
+            current=decision,
+            last_migration_ts=last_migration_ts,
+        )
+        if candidate is not None:
+            logger.info(
+                "Migration recommended at epoch=%d from=%s/%s to=%s/%s new_score=%.3f old_score=%.3f",
+                epoch,
+                decision.region,
+                decision.sku,
+                candidate.region,
+                candidate.sku,
+                candidate.score,
+                decision.score,
+            )
+            decision = candidate
+            last_migration_ts = time.time()
+        else:
+            logger.debug("Epoch=%d no migration", epoch)
 
 
 if __name__ == "__main__":
