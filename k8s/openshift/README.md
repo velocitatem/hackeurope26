@@ -61,6 +61,25 @@ Expected log output includes periodic `mse` and a final `predicted_fare_usd` lin
 make run.nyc.taxi
 ```
 
+## 6) Capacity autoscaling by provider/region (Machine API)
+
+Render and apply provider MachineSets + MachineAutoscalers generated from `ml/data/regions/*`:
+
+```bash
+cp k8s/openshift/machinesets/providers.example.json k8s/openshift/machinesets/providers.json
+# edit provider IDs/secrets/network fields
+
+make openshift.machinesets.render
+make openshift.machinesets.apply
+```
+
+Generated MachineSets are labeled with:
+
+- `energy.io/geo`
+- `energy.io/provider`
+- `energy.io/region`
+- `energy.io/sku`
+
 ## Notes
 
 - The demo job includes label `energy-scheduling=true` and energy annotations, so it is compatible with the webhook flow.

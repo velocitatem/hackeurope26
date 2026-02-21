@@ -54,6 +54,8 @@ src/               Simple scripts / CLI entry points
 | `make lift.database` | Start Postgres / MongoDB |
 | `make openshift.login` | Login to remote OpenShift cluster |
 | `make openshift.demo.nyc` | Submit NYC taxi dummy job |
+| `make openshift.machinesets.render` | Generate EU provider MachineSets |
+| `make openshift.machinesets.apply` | Apply MachineSets + autoscalers |
 | `make doctor` | Verify toolchain |
 
 Run `make help` for the full list.

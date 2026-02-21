@@ -15,9 +15,8 @@ def simple_task(message):
     return f"Processed: {message}"
 
 @app.task
-def add_numbers(x, y):
-    """Simple math task"""
-    return x + y
+def do_claude() -> dict[str, float] | None:
+    pass
 
 if __name__ == '__main__':
     app.start()

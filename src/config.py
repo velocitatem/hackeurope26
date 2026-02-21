@@ -1,7 +1,14 @@
 import os
 
 
-GEOGRAPHIES = ["FR", "DE", "ES"]
+GEOGRAPHIES = [
+    geo.strip().upper()
+    for geo in os.getenv(
+        "SCHED_GEOS",
+        "FR,DE,ES,IT,IE,GB,CH,SE,AT,BE,DK,PL,NL,FI",
+    ).split(",")
+    if geo.strip()
+]
 FREQ_S = int(os.getenv("SCHED_FREQ_S", str(30 * 60)))
 HORIZON_S = int(os.getenv("SCHED_HORIZON_S", str(48 * 60 * 60)))
 

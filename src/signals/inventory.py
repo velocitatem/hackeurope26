@@ -2,16 +2,61 @@ from __future__ import annotations
 
 import os
 import sys
+import json
 from pathlib import Path
 
 from src.models import InventoryNode
 
 
-GEO_TO_REGIONS = {
-    "FR": {"eu-west-3", "francecentral", "europe-west9"},
-    "DE": {"eu-central-1", "germanywestcentral", "europe-west3"},
-    "ES": {"eu-south-2", "spaincentral"},
+COUNTRY_TO_GEO = {
+    "Austria": "AT",
+    "Belgium": "BE",
+    "Denmark": "DK",
+    "Finland": "FI",
+    "France": "FR",
+    "Germany": "DE",
+    "Ireland": "IE",
+    "Italy": "IT",
+    "Netherlands": "NL",
+    "Poland": "PL",
+    "Spain": "ES",
+    "Sweden": "SE",
+    "Switzerland": "CH",
+    "United Kingdom": "GB",
 }
+
+
+def _build_geo_to_regions() -> dict[str, set[str]]:
+    root = Path(__file__).resolve().parents[2]
+    base = root / "ml" / "data" / "regions"
+    mapping: dict[str, set[str]] = {}
+    for provider in ("aws", "azure", "gcp"):
+        sites_path = base / provider / "sites.json"
+        if not sites_path.exists():
+            continue
+        sites = json.loads(sites_path.read_text(encoding="utf-8"))
+        for site in sites:
+            region = str(site.get("name", ""))
+            location = str(site.get("location", ""))
+            if not region or not location:
+                continue
+            country = location.split(",")[-1].strip()
+            geo = COUNTRY_TO_GEO.get(country)
+            if not geo:
+                continue
+            mapping.setdefault(geo, set()).add(region)
+
+    if mapping:
+        return mapping
+
+    return {
+        "FR": {"eu-west-3", "francecentral", "europe-west9"},
+        "DE": {"eu-central-1", "germanywestcentral", "europe-west3"},
+        "ES": {"eu-south-2", "spaincentral"},
+    }
+
+
+GEO_TO_REGIONS = _build_geo_to_regions()
 
 
 def _geo_from_region(region: str) -> str | None:

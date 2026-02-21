@@ -5,6 +5,7 @@ from typing import Any
 
 import requests
 
+from src import config
 from src.models import InventoryNode, JobSpec, SchedulingDecision
 
 
@@ -86,7 +87,7 @@ class RailsClient:
                             item.get("min_gpu_memory_mib", 16 * 1024)
                         ),
                         allowed_geos=list(
-                            item.get("allowed_geos") or ["FR", "DE", "ES"]
+                            item.get("allowed_geos") or config.GEOGRAPHIES
                         ),
                         max_price_usd_hour=(
                             float(item["max_price_usd_hour"])

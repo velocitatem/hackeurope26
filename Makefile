@@ -5,7 +5,7 @@
 .PHONY: lift lift.minio lift.tensorboard lift.logging lift.database
 .PHONY: etl train infer seed
 .PHONY: ai.plan ai.build ai.review ai.agent
-.PHONY: openshift.check openshift.login openshift.whoami openshift.bootstrap openshift.deploy openshift.demo.nyc openshift.status openshift.logs openshift.clean
+.PHONY: openshift.check openshift.login openshift.whoami openshift.bootstrap openshift.deploy openshift.demo.nyc openshift.status openshift.logs openshift.clean openshift.machinesets.render openshift.machinesets.apply
 .DEFAULT_GOAL := help
 
 WD         := $(shell pwd)
@@ -164,6 +164,19 @@ openshift.logs: openshift.check ## Tail logs from all pods in the namespace
 openshift.clean: openshift.check ## Delete all resources in the namespace
 	@read -p "Delete all resources in $(OPENSHIFT_NAMESPACE)? [y/N] " confirm && [ "$$confirm" = "y" ] && \
 		oc delete all --all -n $(OPENSHIFT_NAMESPACE) || echo "Cancelled"
+
+openshift.machinesets.render: ## Generate EU provider MachineSets + MachineAutoscalers
+	@python3 src/openshift_machinesets.py --provider-config k8s/openshift/machinesets/providers.json
+
+openshift.machinesets.apply: openshift.check ## Apply generated MachineSets + MachineAutoscalers
+	@oc auth can-i create machinesets.machine.openshift.io -n openshift-machine-api >/dev/null 2>&1 || (echo "Cannot create MachineSets in openshift-machine-api"; exit 1)
+	@oc auth can-i create machineautoscalers.autoscaling.openshift.io -n openshift-machine-api >/dev/null 2>&1 || (echo "Cannot create MachineAutoscalers in openshift-machine-api"; exit 1)
+	@oc apply -n openshift-machine-api -f k8s/openshift/machinesets/generated/aws-machinesets.yaml
+	@oc apply -n openshift-machine-api -f k8s/openshift/machinesets/generated/aws-machineautoscalers.yaml
+	@oc apply -n openshift-machine-api -f k8s/openshift/machinesets/generated/azure-machinesets.yaml
+	@oc apply -n openshift-machine-api -f k8s/openshift/machinesets/generated/azure-machineautoscalers.yaml
+	@oc apply -n openshift-machine-api -f k8s/openshift/machinesets/generated/gcp-machinesets.yaml
+	@oc apply -n openshift-machine-api -f k8s/openshift/machinesets/generated/gcp-machineautoscalers.yaml
 
 ## ── Service Profiles ─────────────────────────────────────────────────────────
 

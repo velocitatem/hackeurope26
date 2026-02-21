@@ -7,6 +7,7 @@ import time
 from src.models import JobSpec
 from src.scheduler import Scheduler
 from src.signals import EnergyClient, InventoryClient
+from src import config
 
 
 def _coerce_job_spec(payload: dict) -> JobSpec:
@@ -15,7 +16,7 @@ def _coerce_job_spec(payload: dict) -> JobSpec:
         duration_s=int(payload.get("duration_s", 6 * 60 * 60)),
         gpu_count=max(1, int(payload.get("gpu_count", 1))),
         min_gpu_memory_mib=int(payload.get("min_gpu_memory_mib", 16 * 1024)),
-        allowed_geos=list(payload.get("allowed_geos") or ["FR", "DE", "ES"]),
+        allowed_geos=list(payload.get("allowed_geos") or config.GEOGRAPHIES),
         max_price_usd_hour=(
             float(payload["max_price_usd_hour"])
             if payload.get("max_price_usd_hour") is not None
