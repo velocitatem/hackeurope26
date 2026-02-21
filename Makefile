@@ -1,10 +1,11 @@
 # Makefile - Ultiplate Template
 .PHONY: help init bootstrap venv deps envlink fmt lint type test clean doctor
 .PHONY: up down logs ps rebuild
-.PHONY: dev run.webapp run.webapp.simple run.backend run.worker run.ml run.scheduler run.rails db.migrate.rails db.seed.rails
+.PHONY: dev run.webapp run.webapp.simple run.backend run.worker run.ml run.scheduler run.rails run.nyc.taxi db.migrate.rails db.seed.rails
 .PHONY: lift lift.minio lift.tensorboard lift.logging lift.database
 .PHONY: etl train infer seed
 .PHONY: ai.plan ai.build ai.review ai.agent
+.PHONY: openshift.check openshift.start openshift.stop openshift.ocenv openshift.bootstrap openshift.demo.nyc openshift.status
 .DEFAULT_GOAL := help
 
 WD         := $(shell pwd)
@@ -19,6 +20,7 @@ MYPY       := $(VENV)/mypy
 BLACK      := $(VENV)/black
 RUFF       := $(VENV)/ruff
 BUN        := $(shell command -v bun 2>/dev/null || echo bun)
+OPENSHIFT_NAMESPACE ?= hackeurope26
 
 ## ── Quick Start ──────────────────────────────────────────────────────────────
 
@@ -79,8 +81,8 @@ test: venv ## Run pytest
 
 ## ── Docker ───────────────────────────────────────────────────────────────────
 
-up: ## Start core services (redis, postgres, ml-inference, worker, rails)
-	@docker compose up -d redis postgres ml-inference worker rails
+up: ## Start core services (postgres, ml-inference, worker, rails, scheduler)
+	@docker compose up -d postgres ml-inference worker rails scheduler
 
 down: ## Stop all services
 	@docker compose down
@@ -93,6 +95,36 @@ ps: ## Show service status
 
 rebuild: ## Rebuild + restart all services (no cache)
 	@docker compose build --no-cache && docker compose up -d
+
+## ── OpenShift Local (CRC) ────────────────────────────────────────────────────
+
+openshift.check: ## Verify OpenShift local tools (crc, oc)
+	@command -v crc >/dev/null || (echo "crc not found. Install OpenShift Local (CRC): https://developers.redhat.com/products/openshift-local/overview"; exit 1)
+	@command -v oc >/dev/null || (echo "oc not found. Install OpenShift client tools: https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html-single/cli_tools/"; exit 1)
+
+openshift.start: openshift.check ## Start local OpenShift cluster (requires pull secret configured in crc)
+	@crc setup
+	@crc start
+
+openshift.stop: openshift.check ## Stop local OpenShift cluster
+	@crc stop
+
+openshift.ocenv: openshift.check ## Print shell command to configure oc path/env for CRC
+	@crc oc-env
+
+openshift.bootstrap: openshift.check ## Apply namespace + scheduler/webhook scaffolding manifests
+	@oc apply -f k8s/openshift/namespace.yaml
+	@oc apply -f k8s/openshift/trainingjob-crd.yaml
+	@oc apply -f k8s/openshift/secondary-scheduler-configmap.yaml || true
+	@oc apply -f k8s/openshift/mutating-webhook.yaml
+
+openshift.demo.nyc: openshift.check ## Submit NYC taxi dummy training Job to OpenShift
+	@oc apply -f k8s/openshift/nyc-taxi-demo-job.yaml
+
+openshift.status: openshift.check ## Show project pods/jobs and event stream
+	@oc get ns $(OPENSHIFT_NAMESPACE) >/dev/null 2>&1 || (echo "Namespace $(OPENSHIFT_NAMESPACE) not found. Run make openshift.bootstrap"; exit 1)
+	@oc -n $(OPENSHIFT_NAMESPACE) get pods
+	@oc -n $(OPENSHIFT_NAMESPACE) get jobs
 
 ## ── Service Profiles ─────────────────────────────────────────────────────────
 
@@ -144,14 +176,17 @@ run.ml: ## Start ML inference server (FastAPI)
 run.scheduler: ## Start the adaptive scheduler demo loop
 	@$(PYTHON) -m src.main
 
+run.nyc.taxi: ## Run the NYC taxi dummy training script locally
+	@$(PYTHON) -m src.jobs.nyc_taxi_dummy
+
 run.rails: ## Start Rails control-plane API
-	@cd apps/backend/rails && bundle exec rails server -b 0.0.0.0 -p 3001
+	@cd apps/backend/rails && bundle config set path 'vendor/bundle' && bundle install && bundle exec rails server -b 0.0.0.0 -p 3001
 
 db.migrate.rails: ## Run Rails database migrations
-	@cd apps/backend/rails && bundle exec rails db:migrate
+	@cd apps/backend/rails && bundle config set path 'vendor/bundle' && bundle install && bundle exec rails db:migrate
 
 db.seed.rails: ## Seed Rails database with starter nodes
-	@cd apps/backend/rails && bundle exec rails db:seed
+	@cd apps/backend/rails && bundle config set path 'vendor/bundle' && bundle install && bundle exec rails db:seed
 
 ## ── ML Workflow ──────────────────────────────────────────────────────────────
 

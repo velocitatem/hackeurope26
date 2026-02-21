@@ -21,6 +21,7 @@ def main() -> None:
         dispatch_callback=migration.dispatch,
         warm_start_callback=migration.warm_start_target,
     )
+    rails.bulk_upsert_nodes(scheduler.inventory.load())
 
     demo_job = JobSpec(
         job_id="demo-train-001",

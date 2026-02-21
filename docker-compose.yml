@@ -41,13 +41,16 @@ services:
 
   rails:
     container_name: "${NAME}-rails"
-    image: ruby:3.4
+    build:
+      context: .
+      dockerfile: ./docker/rails.Dockerfile
     working_dir: /app
-    command: bash -lc "bundle install && bundle exec rails server -b 0.0.0.0 -p 3001"
+    command: bash -lc "bundle exec rails db:migrate && bundle exec rails db:seed && bundle exec rails server -b 0.0.0.0 -p 3001"
     environment:
       - RAILS_ENV=development
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app}
       - ML_INFERENCE_URL=http://ml-inference:8000
+      - BUNDLE_GEMFILE=/app/Gemfile
     ports:
       - "3001:3001"
     volumes:
@@ -55,6 +58,21 @@ services:
     depends_on:
       - postgres
       - ml-inference
+    restart: unless-stopped
+
+  scheduler:
+    container_name: "${NAME}-scheduler"
+    build:
+      context: .
+      dockerfile: ./docker/scheduler.Dockerfile
+    command: bash -lc "while true; do python -m src.main; sleep 30; done"
+    environment:
+      - PYTHONPATH=/app
+      - ML_INFERENCE_URL=http://ml-inference:8000
+      - RAILS_API_URL=http://rails:3001
+    depends_on:
+      - ml-inference
+      - rails
     restart: unless-stopped
 
   minio:
@@ -157,3 +175,11 @@ volumes:
   grafana_data:
   postgres_data:
   mongodb_data:
+
+networks:
+  default:
+    name: "${NAME}-net"
+    driver: bridge
+    ipam:
+      config:
+        - subnet: "${DOCKER_SUBNET:-10.250.0.0/24}"

@@ -52,6 +52,8 @@ src/               Simple scripts / CLI entry points
 | `make lift.minio` | Start MinIO object storage |
 | `make lift.logging` | Start Loki + Grafana |
 | `make lift.database` | Start Postgres / MongoDB |
+| `make openshift.start` | Start OpenShift Local (CRC) |
+| `make openshift.demo.nyc` | Submit NYC taxi dummy job |
 | `make doctor` | Verify toolchain |
 
 Run `make help` for the full list.

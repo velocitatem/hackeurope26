@@ -5,7 +5,7 @@ from typing import Any
 
 import requests
 
-from src.models import JobSpec, SchedulingDecision
+from src.models import InventoryNode, JobSpec, SchedulingDecision
 
 
 class RailsClient:
@@ -43,6 +43,30 @@ class RailsClient:
         except Exception:
             return
 
+    def bulk_upsert_nodes(self, nodes: list[InventoryNode], limit: int = 500) -> None:
+        payload = {
+            "nodes": [
+                {
+                    "provider": node.provider,
+                    "region": node.region,
+                    "geo": node.geo,
+                    "sku": node.sku,
+                    "price_usd_hour": node.price_usd_hour,
+                    "gpu_count": node.gpu_count,
+                    "gpu_memory_mib": node.gpu_memory_mib,
+                }
+                for node in nodes[:limit]
+            ]
+        }
+        try:
+            requests.post(
+                f"{self.base_url}/api/nodes",
+                json=payload,
+                timeout=max(self.timeout_s, 10.0),
+            ).raise_for_status()
+        except Exception:
+            return
+
     def fetch_pending_jobs(self) -> list[JobSpec]:
         try:
             response = requests.get(
@@ -64,7 +88,11 @@ class RailsClient:
                         allowed_geos=list(
                             item.get("allowed_geos") or ["FR", "DE", "ES"]
                         ),
-                        max_price_usd_hour=item.get("max_price_usd_hour"),
+                        max_price_usd_hour=(
+                            float(item["max_price_usd_hour"])
+                            if item.get("max_price_usd_hour") is not None
+                            else None
+                        ),
                         current_epoch=int(item.get("current_epoch", 0)),
                     )
                 )
