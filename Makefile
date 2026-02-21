@@ -104,10 +104,20 @@ openshift.check: ## Verify OpenShift local tools (crc, oc)
 
 openshift.start: openshift.check ## Start local OpenShift cluster (requires pull secret configured in crc)
 	@crc setup
+	@sudo modprobe vsock vhost_vsock 2>/dev/null || true
+	@pkill -x crc 2>/dev/null || true
+	@rm -f $(HOME)/.crc/crc-http.sock
+	@echo "Starting crc daemon..."
+	@crc daemon >>/tmp/crc-daemon.log 2>&1 &
+	@for i in $$(seq 1 30); do \
+		[ -S $(HOME)/.crc/crc-http.sock ] && break; \
+		sleep 1; \
+	done
 	@crc start
 
 openshift.stop: openshift.check ## Stop local OpenShift cluster
 	@crc stop
+	@pkill -x crc 2>/dev/null || true
 
 openshift.ocenv: openshift.check ## Print shell command to configure oc path/env for CRC
 	@crc oc-env
