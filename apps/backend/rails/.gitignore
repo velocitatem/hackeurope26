@@ -1,0 +1,60 @@
+# Dependencies
+/.bundle
+/vendor/bundle
+
+# Environment & secrets
+.env
+.env.local
+config/master.key
+config/credentials/*.key
+
+# Database
+*.sqlite3
+*.sqlite3-journal
+*.sqlite3-*
+
+# Logs
+/log/*
+!/log/.keep
+
+# Temporary files
+/tmp/*
+!/tmp/.keep
+/tmp/pids/*
+!/tmp/pids/.keep
+/tmp/cache/*
+!/tmp/cache/.keep
+/tmp/sockets/*
+!/tmp/sockets/.keep
+
+# Storage
+/storage/*
+!/storage/.keep
+
+# Public uploads
+/public/uploads
+/public/assets
+/public/packs
+/public/packs-test
+
+# IDEs
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+/coverage
+
+# Node modules (if using Webpacker/JS)
+/node_modules
+/yarn-error.log
+yarn-debug.log*
+
+# Bootsnap cache
+/tmp/cache/bootsnap*
