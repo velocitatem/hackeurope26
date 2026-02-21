@@ -2,7 +2,6 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: nyc-taxi-dummy
-  namespace: hackeurope26
 spec:
   backoffLimit: 0
   template:

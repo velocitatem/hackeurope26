@@ -1,36 +1,28 @@
-# OpenShift Local (CRC) Setup
+# OpenShift Remote Cluster Setup
 
-This folder contains manifests and commands to run a local OpenShift simulation and submit a simple NYC Taxi dummy ML workload.
+This folder contains manifests and commands to deploy to an online OpenShift cluster and submit a simple NYC Taxi dummy ML workload.
 
 ## 1) Install prerequisites
 
-- OpenShift Local (`crc`)
 - OpenShift CLI (`oc`)
-- A Red Hat pull-secret for `crc start`
+- Access to a remote cluster (Developer Sandbox, ROSA, ARO, IBM Cloud)
 
-Quick checks:
+Quick check:
 
 ```bash
 make openshift.check
 ```
 
-## 2) Start local OpenShift
+## 2) Login to remote OpenShift
 
 ```bash
-make openshift.start
+make openshift.login
 ```
 
-Load `oc` environment and login (required for apply/get):
+Or run the command copied from your cluster web console:
 
 ```bash
-eval "$(crc oc-env)"
-oc login -u kubeadmin -p kubeadmin https://api.crc.testing:6443
-```
-
-If your cluster was configured with a generated password, fetch it with:
-
-```bash
-crc console --credentials
+oc login --token=sha256~xxxxx --server=https://api.<cluster-id>.openshiftapps.com:6443
 ```
 
 ## 3) Bootstrap scheduler manifests
@@ -46,6 +38,8 @@ This applies:
 - `k8s/openshift/secondary-scheduler-configmap.yaml`
 - `k8s/openshift/mutating-webhook.yaml`
 
+On Developer Sandbox, cluster-scoped resources are skipped automatically if your user lacks permission.
+
 ## 4) Submit dummy NYC Taxi job
 
 ```bash
@@ -56,7 +50,7 @@ Track status/logs:
 
 ```bash
 make openshift.status
-oc -n hackeurope26 logs job/nyc-taxi-dummy
+oc logs -n "$(oc project -q)" job/nyc-taxi-dummy
 ```
 
 Expected log output includes periodic `mse` and a final `predicted_fare_usd` line.

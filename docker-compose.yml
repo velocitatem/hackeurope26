@@ -14,7 +14,7 @@ services:
       context: ./
       dockerfile: ./docker/ml.Dockerfile
     ports:
-      - "8200:8000"
+      - "8226:8000"
     environment:
       - ML_LATEST_WEIGHTS_PATH=/app/models/weights
       - PYTHONPATH=/app

@@ -21,6 +21,7 @@ Environment variables:
 
 - `DATABASE_URL` (PostgreSQL)
 - `ML_INFERENCE_URL` (FastAPI inference service, default `http://ml-inference:8000`)
+- `SCHED_HOOK_ROOT` (Python scheduler source root, default `/opt/hackeurope`)
 
 ## Webhook behavior
 
@@ -30,4 +31,4 @@ Pods labeled `energy-scheduling=true` are mutated to:
 - target a selected geography via `nodeSelector: { energy.io/geo: <geo> }`
 - include window/score/provider/region/sku annotations
 
-The webhook computes this decision by calling FastAPI delta series endpoints and scoring feasible nodes from the Rails `nodes` table.
+The webhook first invokes the Python scheduler hook (`src/hooks/training_schedule_hook.py`) so admission decisions share the same algorithm used by training scheduling. If the hook fails, it falls back to the Rails-native scorer.

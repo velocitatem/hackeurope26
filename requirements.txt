@@ -3,9 +3,6 @@ python-dotenv
 requests
 tqdm
 
-# Logging (lib)
-python-logging-loki
-
 # Backend (fastapi or flask)
 fastapi
 flask
@@ -30,3 +27,5 @@ anthropic
 # ML (heavy - comment out if not needed)
 torch
 tensorboard
+numpy
+onnxruntime

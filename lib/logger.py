@@ -4,17 +4,14 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
 
-try:
-    from logging_loki import LokiHandler
-    LOKI_AVAILABLE = True
-except ImportError:
-    LOKI_AVAILABLE = False
 
 def get_logger(service_name: str, level: str = "INFO") -> logging.Logger:
     """
@@ -29,6 +26,8 @@ def get_logger(service_name: str, level: str = "INFO") -> logging.Logger:
     """
     logger = logging.getLogger(service_name)
     logger.setLevel(getattr(logging, level.upper()))
+    logger.propagate = False
+    logging.raiseExceptions = False
 
     if not logger.handlers:
         # Console handler with JSON formatting
@@ -43,23 +42,8 @@ def get_logger(service_name: str, level: str = "INFO") -> logging.Logger:
         file_handler.setFormatter(JsonFormatter(service_name))
         logger.addHandler(file_handler)
 
-        # Loki handler - sends logs directly to Loki
-        if LOKI_AVAILABLE:
-            loki_port = os.getenv("LOKI_PORT", "3100")
-            loki_url = f"http://localhost:{loki_port}/loki/api/v1/push"
-
-            try:
-                loki_handler = LokiHandler(
-                    url=loki_url,
-                    tags={"service": service_name},
-                    version="1"
-                )
-                logger.addHandler(loki_handler)
-            except Exception as e:
-                # If Loki is not available, just continue with file/console logging
-                pass
-
     return logger
+
 
 class JsonFormatter(logging.Formatter):
     def __init__(self, service_name: str):
@@ -74,7 +58,7 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
             "module": record.module,
             "function": record.funcName,
-            "line": record.lineno
+            "line": record.lineno,
         }
 
         if record.exc_info:

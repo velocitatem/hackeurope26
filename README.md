@@ -52,7 +52,7 @@ src/               Simple scripts / CLI entry points
 | `make lift.minio` | Start MinIO object storage |
 | `make lift.logging` | Start Loki + Grafana |
 | `make lift.database` | Start Postgres / MongoDB |
-| `make openshift.start` | Start OpenShift Local (CRC) |
+| `make openshift.login` | Login to remote OpenShift cluster |
 | `make openshift.demo.nyc` | Submit NYC taxi dummy job |
 | `make doctor` | Verify toolchain |
 
@@ -93,7 +93,7 @@ from lib import get_logger
 logger = get_logger("service")
 ```
 
-Outputs structured JSON to console + `./logs/`. Optional Loki push when `LOKI_PORT` is set and `make lift.logging` is running. View in Grafana at `http://localhost:$GRAFANA_PORT` (add Loki data source: `http://loki:3100`).
+Outputs structured JSON to console + `./logs/`.
 
 ## Services (docker compose profiles)
 

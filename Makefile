@@ -1,11 +1,11 @@
 # Makefile - Ultiplate Template
 .PHONY: help init bootstrap venv deps envlink fmt lint type test clean doctor
 .PHONY: up down logs ps rebuild
-.PHONY: dev run.webapp run.webapp.simple run.backend run.worker run.ml run.scheduler run.rails run.nyc.taxi db.migrate.rails db.seed.rails
+.PHONY: dev run.webapp run.webapp.simple run.backend run.worker run.ml run.scheduler run.rails run.nyc.taxi run.pytorch db.migrate.rails db.seed.rails
 .PHONY: lift lift.minio lift.tensorboard lift.logging lift.database
 .PHONY: etl train infer seed
 .PHONY: ai.plan ai.build ai.review ai.agent
-.PHONY: openshift.check openshift.start openshift.stop openshift.ocenv openshift.bootstrap openshift.demo.nyc openshift.status
+.PHONY: openshift.check openshift.login openshift.whoami openshift.bootstrap openshift.deploy openshift.demo.nyc openshift.status openshift.logs openshift.clean
 .DEFAULT_GOAL := help
 
 WD         := $(shell pwd)
@@ -20,7 +20,7 @@ MYPY       := $(VENV)/mypy
 BLACK      := $(VENV)/black
 RUFF       := $(VENV)/ruff
 BUN        := $(shell command -v bun 2>/dev/null || echo bun)
-OPENSHIFT_NAMESPACE ?= hackeurope26
+OPENSHIFT_NAMESPACE ?= $(shell oc project -q 2>/dev/null || echo hackeurope26)
 
 ## ── Quick Start ──────────────────────────────────────────────────────────────
 
@@ -96,41 +96,74 @@ ps: ## Show service status
 rebuild: ## Rebuild + restart all services (no cache)
 	@docker compose build --no-cache && docker compose up -d
 
-## ── OpenShift Local (CRC) ────────────────────────────────────────────────────
+## ── OpenShift Deployment (Remote Clusters) ─────────────────────────────────
+# Recommended for sandbox and cloud clusters.
+# Flow: make openshift.login -> make openshift.bootstrap -> make openshift.deploy
 
-openshift.check: ## Verify OpenShift local tools (crc, oc)
-	@command -v crc >/dev/null || (echo "crc not found. Install OpenShift Local (CRC): https://developers.redhat.com/products/openshift-local/overview"; exit 1)
+openshift.check: ## Verify OpenShift CLI tools (oc)
 	@command -v oc >/dev/null || (echo "oc not found. Install OpenShift client tools: https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html-single/cli_tools/"; exit 1)
 
-openshift.hosts: ## Add CRC DNS entries to /etc/hosts (requires sudo)
-	@grep -q "api.crc.testing" /etc/hosts 2>/dev/null && echo "CRC hosts already configured" || \
-		(echo "Adding CRC DNS entries to /etc/hosts..." && \
-		echo "127.0.0.1 api.crc.testing console-openshift-console.apps-crc.testing oauth-openshift.apps-crc.testing downloads-openshift-console.apps-crc.testing" | sudo tee -a /etc/hosts >/dev/null)
+openshift.login: openshift.check ## Login to remote OpenShift cluster (Sandbox/ROSA/ARO)
+	@echo "Get your login command from:"
+	@echo "  - Developer Sandbox: https://developers.redhat.com/developer-sandbox"
+	@echo "  - ROSA/ARO: Copy login command from web console"
+	@echo ""
+	@echo "Example: oc login --token=sha256~... --server=https://api.sandbox-m2.ll9k.p1.openshiftapps.com:6443"
+	@echo ""
+	@read -p "Paste your 'oc login' command: " cmd && eval "$$cmd"
 
-openshift.start: openshift.check openshift.hosts ## Start local OpenShift cluster (requires pull secret configured in crc)
-	@crc setup
-	@crc start
-
-openshift.stop: openshift.check ## Stop local OpenShift cluster
-	@crc stop
-	@pkill -x crc 2>/dev/null || true
-
-openshift.ocenv: openshift.check ## Print shell command to configure oc path/env for CRC
-	@crc oc-env
+openshift.whoami: openshift.check ## Show current OpenShift cluster and user context
+	@echo "Current cluster:"
+	@oc whoami --show-server 2>/dev/null || echo "Not logged in"
+	@echo "Current user:"
+	@oc whoami 2>/dev/null || echo "Not logged in"
+	@echo "Current project:"
+	@oc project -q 2>/dev/null || echo "No project selected"
 
 openshift.bootstrap: openshift.check ## Apply namespace + scheduler/webhook scaffolding manifests
-	@oc apply -f k8s/openshift/namespace.yaml
-	@oc apply -f k8s/openshift/trainingjob-crd.yaml
-	@oc apply -f k8s/openshift/secondary-scheduler-configmap.yaml || true
-	@oc apply -f k8s/openshift/mutating-webhook.yaml
+	@echo "Using project: $(OPENSHIFT_NAMESPACE)"
+	@if oc auth can-i create namespaces >/dev/null 2>&1 && [ "$$(oc auth can-i create namespaces)" = "yes" ]; then \
+		oc apply -f k8s/openshift/namespace.yaml; \
+		oc project $(OPENSHIFT_NAMESPACE) 2>/dev/null || true; \
+	else \
+		echo "Skipping namespace creation (no cluster-scoped permission)."; \
+		echo "Using current project from login context."; \
+	fi
+	@if oc auth can-i create customresourcedefinitions.apiextensions.k8s.io >/dev/null 2>&1 && [ "$$(oc auth can-i create customresourcedefinitions.apiextensions.k8s.io)" = "yes" ]; then \
+		oc apply -f k8s/openshift/trainingjob-crd.yaml; \
+	else \
+		echo "Skipping TrainingJob CRD (cluster-admin required)."; \
+	fi
+	@if oc auth can-i create configmaps -n openshift-secondary-scheduler-operator >/dev/null 2>&1 && [ "$$(oc auth can-i create configmaps -n openshift-secondary-scheduler-operator)" = "yes" ]; then \
+		oc apply -f k8s/openshift/secondary-scheduler-configmap.yaml; \
+	else \
+		echo "Skipping secondary scheduler configmap (not allowed in openshift-secondary-scheduler-operator)."; \
+	fi
+	@if oc auth can-i create mutatingwebhookconfigurations.admissionregistration.k8s.io >/dev/null 2>&1 && [ "$$(oc auth can-i create mutatingwebhookconfigurations.admissionregistration.k8s.io)" = "yes" ]; then \
+		oc apply -f k8s/openshift/mutating-webhook.yaml; \
+	else \
+		echo "Skipping mutating webhook (cluster-admin required)."; \
+	fi
+
+openshift.deploy: openshift.check ## Deploy all application manifests to current cluster
+	@echo "Deploying to: $$(oc whoami --show-server)"
+	@oc -n $(OPENSHIFT_NAMESPACE) apply -f k8s/openshift/nyc-taxi-demo-job.yaml
+	@echo "Deployment complete. Check status with: make openshift.status"
 
 openshift.demo.nyc: openshift.check ## Submit NYC taxi dummy training Job to OpenShift
-	@oc apply -f k8s/openshift/nyc-taxi-demo-job.yaml
+	@oc -n $(OPENSHIFT_NAMESPACE) apply -f k8s/openshift/nyc-taxi-demo-job.yaml
 
 openshift.status: openshift.check ## Show project pods/jobs and event stream
 	@oc get ns $(OPENSHIFT_NAMESPACE) >/dev/null 2>&1 || (echo "Namespace $(OPENSHIFT_NAMESPACE) not found. Run make openshift.bootstrap"; exit 1)
 	@oc -n $(OPENSHIFT_NAMESPACE) get pods
 	@oc -n $(OPENSHIFT_NAMESPACE) get jobs
+
+openshift.logs: openshift.check ## Tail logs from all pods in the namespace
+	@oc -n $(OPENSHIFT_NAMESPACE) logs -f --all-containers=true --prefix=true --tail=50 -l app || echo "No pods with label app="
+
+openshift.clean: openshift.check ## Delete all resources in the namespace
+	@read -p "Delete all resources in $(OPENSHIFT_NAMESPACE)? [y/N] " confirm && [ "$$confirm" = "y" ] && \
+		oc delete all --all -n $(OPENSHIFT_NAMESPACE) || echo "Cancelled"
 
 ## ── Service Profiles ─────────────────────────────────────────────────────────
 
@@ -184,6 +217,9 @@ run.scheduler: ## Start the adaptive scheduler demo loop
 
 run.nyc.taxi: ## Run the NYC taxi dummy training script locally
 	@$(PYTHON) -m src.jobs.nyc_taxi_dummy
+
+run.pytorch: ## Run a simple PyTorch training loop example
+	@$(PYTHON) -m src.jobs.pytorch_train_example
 
 run.rails: ## Start Rails control-plane API
 	@cd apps/backend/rails && bundle config set path 'vendor/bundle' && bundle install && bundle exec rails server -b 0.0.0.0 -p 3001
