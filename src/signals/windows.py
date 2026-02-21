@@ -12,14 +12,14 @@ def best_positive_window(
 
     freq_s = int(series[1]["t"] - series[0]["t"])
     steps = max(1, duration_s // freq_s)
-    if len(series) <= steps:
+    if len(series) < steps:
         return None
 
     deltas = [point["delta"] for point in series]
     times = [point["t"] for point in series]
 
     best: TimeWindow | None = None
-    for i in range(0, len(series) - steps):
+    for i in range(0, len(series) - steps + 1):
         window_deltas = deltas[i : i + steps]
         if any(delta <= config.MIN_DELTA_THRESHOLD for delta in window_deltas):
             continue

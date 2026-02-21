@@ -102,17 +102,13 @@ openshift.check: ## Verify OpenShift local tools (crc, oc)
 	@command -v crc >/dev/null || (echo "crc not found. Install OpenShift Local (CRC): https://developers.redhat.com/products/openshift-local/overview"; exit 1)
 	@command -v oc >/dev/null || (echo "oc not found. Install OpenShift client tools: https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html-single/cli_tools/"; exit 1)
 
-openshift.start: openshift.check ## Start local OpenShift cluster (requires pull secret configured in crc)
+openshift.hosts: ## Add CRC DNS entries to /etc/hosts (requires sudo)
+	@grep -q "api.crc.testing" /etc/hosts 2>/dev/null && echo "CRC hosts already configured" || \
+		(echo "Adding CRC DNS entries to /etc/hosts..." && \
+		echo "127.0.0.1 api.crc.testing console-openshift-console.apps-crc.testing oauth-openshift.apps-crc.testing downloads-openshift-console.apps-crc.testing" | sudo tee -a /etc/hosts >/dev/null)
+
+openshift.start: openshift.check openshift.hosts ## Start local OpenShift cluster (requires pull secret configured in crc)
 	@crc setup
-	@sudo modprobe vsock vhost_vsock 2>/dev/null || true
-	@pkill -x crc 2>/dev/null || true
-	@rm -f $(HOME)/.crc/crc-http.sock
-	@echo "Starting crc daemon..."
-	@crc daemon >>/tmp/crc-daemon.log 2>&1 &
-	@for i in $$(seq 1 30); do \
-		[ -S $(HOME)/.crc/crc-http.sock ] && break; \
-		sleep 1; \
-	done
 	@crc start
 
 openshift.stop: openshift.check ## Stop local OpenShift cluster
