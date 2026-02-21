@@ -1,0 +1,106 @@
+[
+  {
+    "name": "austriaeast",
+    "location": "Vienna, Austria",
+    "coordinates": [
+      48.20849,
+      16.37208
+    ]
+  },
+  {
+    "name": "belgiumcentral",
+    "location": "Brussels, Belgium",
+    "coordinates": [
+      50.85045,
+      4.34878
+    ]
+  },
+  {
+    "name": "denmarkeast",
+    "location": "Copenhagen, Denmark",
+    "coordinates": [
+      55.67594,
+      12.56553
+    ]
+  },
+  {
+    "name": "francecentral",
+    "location": "Paris, France",
+    "coordinates": [
+      48.85341,
+      2.3488
+    ]
+  },
+  {
+    "name": "francesouth",
+    "location": "Marseille, France",
+    "coordinates": [
+      43.29695,
+      5.38107
+    ]
+  },
+  {
+    "name": "germanynorth",
+    "location": "Berlin, Germany",
+    "coordinates": [
+      52.52437,
+      13.41053
+    ]
+  },
+  {
+    "name": "germanywestcentral",
+    "location": "Frankfurt, Germany",
+    "coordinates": [
+      50.11552,
+      8.68417
+    ]
+  },
+  {
+    "name": "italynorth",
+    "location": "Milan, Italy",
+    "coordinates": [
+      45.46427,
+      9.18951
+    ]
+  },
+  {
+    "name": "northeurope",
+    "location": "Dublin, Ireland",
+    "coordinates": [
+      53.33306,
+      -6.24889
+    ]
+  },
+  {
+    "name": "polandcentral",
+    "location": "Warsaw, Poland",
+    "coordinates": [
+      52.22977,
+      21.01178
+    ]
+  },
+  {
+    "name": "spaincentral",
+    "location": "Madrid, Spain",
+    "coordinates": [
+      40.4165,
+      -3.70256
+    ]
+  },
+  {
+    "name": "swedencentral",
+    "location": "Gävle, Sweden",
+    "coordinates": [
+      60.67452,
+      17.14174
+    ]
+  },
+  {
+    "name": "westeurope",
+    "location": "Amsterdam, Netherlands",
+    "coordinates": [
+      52.37403,
+      4.88969
+    ]
+  }
+]
