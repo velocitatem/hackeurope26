@@ -43,6 +43,53 @@ class RailsClient:
         except Exception:
             return
 
+    def fetch_pending_jobs(self) -> list[JobSpec]:
+        try:
+            response = requests.get(
+                f"{self.base_url}/api/jobs",
+                params={"status": "pending"},
+                timeout=self.timeout_s,
+            )
+            response.raise_for_status()
+            jobs: list[JobSpec] = []
+            for item in response.json():
+                jobs.append(
+                    JobSpec(
+                        job_id=item["external_id"],
+                        duration_s=int(item.get("duration_s", 6 * 60 * 60)),
+                        gpu_count=int(item.get("gpu_count", 1)),
+                        min_gpu_memory_mib=int(
+                            item.get("min_gpu_memory_mib", 16 * 1024)
+                        ),
+                        allowed_geos=list(
+                            item.get("allowed_geos") or ["FR", "DE", "ES"]
+                        ),
+                        max_price_usd_hour=item.get("max_price_usd_hour"),
+                        current_epoch=int(item.get("current_epoch", 0)),
+                    )
+                )
+            return jobs
+        except Exception:
+            return []
+
+    def update_job_status(
+        self, external_id: str, status: str, current_epoch: int | None = None
+    ) -> None:
+        try:
+            existing = self._find_job_by_external_id(external_id)
+            if existing is None:
+                return
+            payload: dict[str, Any] = {"job": {"status": status}}
+            if current_epoch is not None:
+                payload["job"]["current_epoch"] = current_epoch
+            requests.patch(
+                f"{self.base_url}/api/jobs/{existing['id']}",
+                json=payload,
+                timeout=self.timeout_s,
+            ).raise_for_status()
+        except Exception:
+            return
+
     def post_decision(
         self, decision: SchedulingDecision, source: str = "scheduler"
     ) -> None:
