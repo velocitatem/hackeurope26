@@ -1,5 +1,7 @@
 # Ultiplate
 
+![](./output.gif)
+
 Template for any project: SaaS webapp, API server, ML pipeline, scraper, CLI, or background worker. AI-native, platform-agnostic, managed via Makefile.
 
 ## Quick Start
