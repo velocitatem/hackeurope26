@@ -1,0 +1,66 @@
+[
+  {
+    "name": "eu-west-1",
+    "location": "Dublin, Ireland",
+    "coordinates": [
+      53.3498,
+      -6.2603
+    ]
+  },
+  {
+    "name": "eu-west-2",
+    "location": "London, United Kingdom",
+    "coordinates": [
+      51.5074,
+      -0.1278
+    ]
+  },
+  {
+    "name": "eu-west-3",
+    "location": "Paris, France",
+    "coordinates": [
+      48.8566,
+      2.3522
+    ]
+  },
+  {
+    "name": "eu-central-1",
+    "location": "Frankfurt, Germany",
+    "coordinates": [
+      50.1109,
+      8.6821
+    ]
+  },
+  {
+    "name": "eu-central-2",
+    "location": "Zurich, Switzerland",
+    "coordinates": [
+      47.3643,
+      8.5437
+    ]
+  },
+  {
+    "name": "eu-north-1",
+    "location": "Stockholm, Sweden",
+    "coordinates": [
+      59.3293,
+      18.0686
+    ]
+  },
+  {
+    "name": "eu-south-1",
+    "location": "Milan, Italy",
+    "coordinates": [
+      45.4681,
+      9.2011
+    ]
+  },
+  {
+    "name": "eu-south-2",
+    "location": "Zaragoza (Aragón), Spain",
+    "coordinates": [
+      41.6579,
+      -0.8777
+    ]
+  }
+]
