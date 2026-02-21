@@ -9,3 +9,9 @@ logs/
 FLAT.xml
 **/package-lock.json
 .vscode/settings.json
+.DS_Store
+ml/data/weather-data/country_dfs
+
+ml/data/uk/uk-dataml/data/uk/uk-data/generation.csv
+ml/data/uk/uk-data/generation.csv
+ml/data/uk/uk-data/generation.csv
