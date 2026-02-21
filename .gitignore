@@ -8,3 +8,8 @@
 logs/
 FLAT.xml
 **/package-lock.json
+
+
+ml/data/GenerationByFuelType-2016-01-01T00_00_00.000Z-2026-02-21T13_00_00.000Z.csv
+ml/data/monthly_hourly_load_values_2025.xlsx
+ml/data/df_fuel_ckan.csv
