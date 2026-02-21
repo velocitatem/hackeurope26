@@ -21,8 +21,6 @@ services:
     volumes:
       - ./ml/models:/app/models
       - ./.env:/app/.env
-    depends_on:
-      - redis
     restart: unless-stopped
 
   worker:
