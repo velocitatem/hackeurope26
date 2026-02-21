@@ -1,7 +1,7 @@
 # Makefile - Ultiplate Template
 .PHONY: help init bootstrap venv deps envlink fmt lint type test clean doctor
 .PHONY: up down logs ps rebuild
-.PHONY: dev run.webapp run.webapp.simple run.backend run.worker run.ml run.scheduler
+.PHONY: dev run.webapp run.webapp.simple run.backend run.worker run.ml run.scheduler run.rails db.migrate.rails db.seed.rails
 .PHONY: lift lift.minio lift.tensorboard lift.logging lift.database
 .PHONY: etl train infer seed
 .PHONY: ai.plan ai.build ai.review ai.agent
@@ -79,8 +79,8 @@ test: venv ## Run pytest
 
 ## ── Docker ───────────────────────────────────────────────────────────────────
 
-up: ## Start core services (redis, ml-inference, worker)
-	@docker compose up -d redis ml-inference worker
+up: ## Start core services (redis, postgres, ml-inference, worker, rails)
+	@docker compose up -d redis postgres ml-inference worker rails
 
 down: ## Stop all services
 	@docker compose down
@@ -143,6 +143,15 @@ run.ml: ## Start ML inference server (FastAPI)
 
 run.scheduler: ## Start the adaptive scheduler demo loop
 	@$(PYTHON) -m src.main
+
+run.rails: ## Start Rails control-plane API
+	@cd apps/backend/rails && bundle exec rails server -b 0.0.0.0 -p 3001
+
+db.migrate.rails: ## Run Rails database migrations
+	@cd apps/backend/rails && bundle exec rails db:migrate
+
+db.seed.rails: ## Seed Rails database with starter nodes
+	@cd apps/backend/rails && bundle exec rails db:seed
 
 ## ── ML Workflow ──────────────────────────────────────────────────────────────
 

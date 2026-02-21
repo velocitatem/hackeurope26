@@ -5,13 +5,15 @@ from lib import get_logger
 from src import config
 from src.migration import MigrationManager
 from src.models import JobSpec
+from src.rails_client import RailsClient
 from src.scheduler import Scheduler
 from src.signals import EnergyClient, InventoryClient
 
 
 def main() -> None:
     logger = get_logger("scheduler", level="DEBUG")
-    migration = MigrationManager()
+    rails = RailsClient()
+    migration = MigrationManager(rails_client=rails)
 
     scheduler = Scheduler(
         energy=EnergyClient(),
@@ -27,6 +29,7 @@ def main() -> None:
         min_gpu_memory_mib=16 * 1024,
         allowed_geos=config.GEOGRAPHIES,
     )
+    rails.upsert_job(job)
 
     decision = scheduler.schedule(job)
     logger.info(
@@ -45,12 +48,26 @@ def main() -> None:
     last_migration_ts = None
     for epoch in range(1, 31):
         job.current_epoch = epoch
+        rails.upsert_job(job)
         candidate = scheduler.evaluate_migration(
             job=job,
             current=decision,
             last_migration_ts=last_migration_ts,
         )
         if candidate is not None:
+            rails.post_migration_event(
+                job_id=job.job_id,
+                epoch=epoch,
+                from_region=decision.region,
+                from_sku=decision.sku,
+                from_score=decision.score,
+                to_region=candidate.region,
+                to_sku=candidate.sku,
+                to_score=candidate.score,
+                status="recommended",
+                message="Adaptive reevaluation exceeded migration threshold",
+                reason_json=candidate.reason,
+            )
             logger.info(
                 "Migration recommended at epoch=%d from=%s/%s to=%s/%s new_score=%.3f old_score=%.3f",
                 epoch,

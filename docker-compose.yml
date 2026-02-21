@@ -39,6 +39,24 @@ services:
       - redis
     restart: unless-stopped
 
+  rails:
+    container_name: "${NAME}-rails"
+    image: ruby:3.4
+    working_dir: /app
+    command: bash -lc "bundle install && bundle exec rails server -b 0.0.0.0 -p 3001"
+    environment:
+      - RAILS_ENV=development
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app}
+      - ML_INFERENCE_URL=http://ml-inference:8000
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./apps/backend/rails:/app
+    depends_on:
+      - postgres
+      - ml-inference
+    restart: unless-stopped
+
   minio:
     image: minio/minio:latest
     container_name: "${NAME}-minio"
@@ -106,7 +124,6 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: "${NAME}-postgres"
-    profiles: ["database", "postgres"]
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     environment:
