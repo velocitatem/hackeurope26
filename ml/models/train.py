@@ -1,10 +1,11 @@
 import torch
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
-from alveslib import get_logger
+from lib import get_logger
 
 logger = get_logger("ml-trainloop")
 logger.info("initiated loop for training")
+
 
 class Trainer:
     def __init__(self, model, train_loader, log_dir="../tensorboard"):
@@ -25,7 +26,7 @@ class Trainer:
             self.optimizer.step()
 
             if batch_idx % 100 == 0:
-                self.writer.add_scalar('Loss/Train', loss.item(), self.step)
+                self.writer.add_scalar("Loss/Train", loss.item(), self.step)
                 self.step += 1
 
     def train(self, epochs):

@@ -30,7 +30,7 @@ ml/
   data/            etl.py - raw -> PyTorch dataset pipeline
   inference.py     FastAPI inference server
   notebooks/       Jupyter notebooks
-alveslib/          Shared Python utilities (logger, scraper, agent)
+lib/               Shared Python utilities (logger, scraper, agent)
 src/               Simple scripts / CLI entry points
 ```
 
@@ -59,7 +59,7 @@ Run `make help` for the full list.
 Set `ANTHROPIC_API_KEY` in `.env`. Then use:
 
 ```python
-from alveslib import ask, stream, Agent
+from lib import ask, stream, Agent
 
 # One-shot
 print(ask("Summarize this data: ..."))
@@ -85,7 +85,7 @@ Claude Code slash commands (type `/` in a Claude Code session):
 ## Logging
 
 ```python
-from alveslib import get_logger
+from lib import get_logger
 logger = get_logger("service")
 ```
 

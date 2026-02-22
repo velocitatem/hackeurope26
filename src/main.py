@@ -1,4 +1,4 @@
-from alveslib import get_logger
+from lib import get_logger
 
 
 def main():

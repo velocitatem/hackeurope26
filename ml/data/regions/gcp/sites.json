@@ -1,0 +1,106 @@
+[
+  {
+    "name": "europe-central2",
+    "location": "Warsaw, Poland",
+    "coordinates": [
+      52.22977,
+      21.01178
+    ]
+  },
+  {
+    "name": "europe-north1",
+    "location": "Hamina, Finland",
+    "coordinates": [
+      60.5697,
+      27.1979
+    ]
+  },
+  {
+    "name": "europe-north2",
+    "location": "Stockholm, Sweden",
+    "coordinates": [
+      59.32938,
+      18.06871
+    ]
+  },
+  {
+    "name": "europe-southwest1",
+    "location": "Madrid, Spain",
+    "coordinates": [
+      40.41678,
+      -3.70379
+    ]
+  },
+  {
+    "name": "europe-west1",
+    "location": "St. Ghislain, Belgium",
+    "coordinates": [
+      50.44816,
+      3.81886
+    ]
+  },
+  {
+    "name": "europe-west2",
+    "location": "London, United Kingdom",
+    "coordinates": [
+      51.50735,
+      -0.12776
+    ]
+  },
+  {
+    "name": "europe-west3",
+    "location": "Frankfurt, Germany",
+    "coordinates": [
+      50.11092,
+      8.68213
+    ]
+  },
+  {
+    "name": "europe-west4",
+    "location": "Eemshaven, Netherlands",
+    "coordinates": [
+      53.45,
+      6.83333
+    ]
+  },
+  {
+    "name": "europe-west6",
+    "location": "Zurich, Switzerland",
+    "coordinates": [
+      47.37055,
+      8.54177
+    ]
+  },
+  {
+    "name": "europe-west8",
+    "location": "Milan, Italy",
+    "coordinates": [
+      45.46427,
+      9.18951
+    ]
+  },
+  {
+    "name": "europe-west9",
+    "location": "Paris, France",
+    "coordinates": [
+      48.85661,
+      2.35222
+    ]
+  },
+  {
+    "name": "europe-west10",
+    "location": "Berlin, Germany",
+    "coordinates": [
+      52.52001,
+      13.40495
+    ]
+  },
+  {
+    "name": "europe-west12",
+    "location": "Turin, Italy",
+    "coordinates": [
+      45.07031,
+      7.68686
+    ]
+  }
+]
