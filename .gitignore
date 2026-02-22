@@ -9,6 +9,22 @@ logs/
 FLAT.xml
 **/package-lock.json
 .vscode/settings.json
+ml/fr/fr_merged.parquet
+ml/fin/fin_y_test_set.parquet
+.gitignore
+ml/fin/fin_train_set.parquet
+ml/fin/fin_x_test_set.parquet
+ml/fr/fr_train_set.parquet
+.gitignore
+ml/fr/fr_y_test_set.parquet
+ml/fr/fr_x_test_set.parquet
+ml/data/ita/*
+ml/data/fin/*
+ml/data/fr/*
+ml/data/uk/*
+ml/data/weather-data/*
+*.png
+*.csv
 .DS_Store
 ml/data/weather-data/country_dfs
 
