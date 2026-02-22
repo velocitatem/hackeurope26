@@ -210,6 +210,19 @@ async def execute_prepared_job(job_id: str, body: ExecuteRequest) -> dict[str, s
     if not job:
         raise HTTPException(status_code=404, detail="job not found")
 
+    dispatch_ready_raw = job.get("dispatch_ready")
+    if isinstance(dispatch_ready_raw, bool):
+        dispatch_ready = dispatch_ready_raw
+    elif isinstance(dispatch_ready_raw, str):
+        dispatch_ready = dispatch_ready_raw.strip().lower() in {"1", "true", "yes"}
+    else:
+        dispatch_ready = False
+    if not dispatch_ready and str(job.get("status") or "") != "prepared":
+        raise HTTPException(
+            status_code=409,
+            detail="job is not prepared for deployment yet",
+        )
+
     payload = {
         "job_id": job_id,
         "image": body.image,
@@ -268,14 +281,34 @@ async def get_job(job_id: str) -> dict[str, object]:
 
 
 @app.get("/jobs/{job_id}/files")
-async def get_job_files(job_id: str) -> dict[str, object]:
-    try:
-        vfs = VirtualFileSystem.from_redis(redis_client, f"vfs:{job_id}")
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+async def get_job_files(job_id: str, stage: str = "prepared") -> dict[str, object]:
+    stage_norm = stage.strip().lower()
+    if stage_norm not in {"prepared", "source"}:
+        raise HTTPException(
+            status_code=400, detail="stage must be 'prepared' or 'source'"
+        )
+
+    keys: list[tuple[str, str]]
+    if stage_norm == "prepared":
+        keys = [("prepared", f"vfs:{job_id}:prepared"), ("source", f"vfs:{job_id}")]
+    else:
+        keys = [("source", f"vfs:{job_id}")]
+
+    vfs = None
+    selected_stage = ""
+    for label, key in keys:
+        try:
+            vfs = VirtualFileSystem.from_redis(redis_client, key)
+            selected_stage = label
+            break
+        except KeyError:
+            continue
+    if vfs is None:
+        raise HTTPException(status_code=404, detail=f"vfs not found for job {job_id}")
 
     return {
         "job_id": job_id,
+        "stage": selected_stage,
         "root_url": vfs.root_url,
         "branch": vfs.branch,
         "file_count": len(vfs.tree),

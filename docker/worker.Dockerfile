@@ -1,5 +1,7 @@
 FROM python:3.12-slim
 
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 WORKDIR /app
 
 # Install system dependencies
@@ -10,7 +12,7 @@ RUN apt-get update && apt-get install -y \
 
 # Dependency layer (cached unless worker requirements change)
 COPY apps/worker/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN uv pip install --system --no-cache -r requirements.txt
 
 # App code layer
 RUN mkdir -p ./worker/

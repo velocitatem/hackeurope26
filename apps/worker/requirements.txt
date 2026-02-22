@@ -30,6 +30,5 @@ anthropic
 claude-agent-sdk
 kubernetes
 
-# ML (heavy - comment out if not needed)
-torch
+# ML (heavy - comment out if not needed) torch
 tensorboard

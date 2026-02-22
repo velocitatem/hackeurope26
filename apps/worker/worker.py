@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import difflib
 import json
 import logging
 import os
@@ -24,7 +25,11 @@ import requests
 
 from lib.vfs import VirtualFileSystem
 
-from claude_agent_sdk import ClaudeAgentOptions, query
+try:
+    from claude_agent_sdk import ClaudeAgentOptions, query
+except Exception:
+    ClaudeAgentOptions = None
+    query = None
 
 try:
     from git import Repo
@@ -89,6 +94,24 @@ class RepoAnalysis(BaseModel):
     requires_dockerfile: bool
     dependencies: list[str]
     notes: str
+
+
+class AgentAutonomyResult(BaseModel):
+    framework: str
+    entrypoint: str
+    gpu_count: int
+    gpu_mem_gib: int
+    estimated_hours: float
+    requires_dockerfile: bool
+    dependencies: list[str] = Field(default_factory=list)
+    notes: str = ""
+    dockerfile_path: str = "Dockerfile"
+    training_command: list[str] = Field(default_factory=list)
+    codecarbon_summary: str = ""
+
+
+READ_ONLY_AGENT_TOOLS = ["Read", "Glob", "Grep"]
+CODE_AGENT_TOOLS = ["Read", "Glob", "Grep", "Edit", "Write", "Bash"]
 
 
 def _redis() -> redis.Redis:
@@ -281,13 +304,69 @@ def _describe_message(message: object) -> str:
     return " | ".join(parts)
 
 
-async def _run_agent(prompt: str, timeout: int = 300, verbose: bool = False) -> str:
+def _build_autonomous_code_prompt(
+    job_id: str, selected_image: str | None = None
+) -> str:
+    image_note = selected_image.strip() if isinstance(selected_image, str) else ""
+    image_hint = image_note or "<generate image externally if not provided>"
+    return (
+        "You are an autonomous AI code agent operating on a cloned training "
+        "repository.\n"
+        "Objectives:\n"
+        "1) Integrate CodeCarbon instrumentation so training runs emit carbon "
+        "metrics.\n"
+        "2) Make concrete source-code edits in this repository.\n"
+        "3) Ensure dependencies include CodeCarbon in the project's existing "
+        "dependency system.\n"
+        "4) Ensure a Dockerfile exists and starts the real training job "
+        "entrypoint.\n"
+        "5) Prefer minimal, targeted edits; do not rewrite the project.\n"
+        "6) Validate by running lightweight checks only (syntax/help/import where "
+        "possible).\n\n"
+        "Hard requirements:\n"
+        "- Detect the likely training entrypoint (script/module/command).\n"
+        "- Add robust CodeCarbon tracker start/stop around training execution.\n"
+        "- Keep the repository runnable without requiring cloud credentials.\n"
+        "- If no clear insertion point exists, create a thin wrapper entrypoint.\n"
+        "- If Dockerfile is missing, create one that installs deps and runs "
+        "training.\n"
+        "- Never output markdown in final response.\n"
+        "- Final response must be strict JSON only with keys: framework, "
+        "entrypoint, gpu_count, gpu_mem_gib, estimated_hours, "
+        "requires_dockerfile, dependencies, notes, dockerfile_path, "
+        "training_command, codecarbon_summary.\n\n"
+        "Context:\n"
+        f"- job_id: {job_id}\n"
+        f"- preferred image tag: {image_hint}\n"
+    )
+
+
+def _strip_code_fence(raw: str) -> str:
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+    return cleaned
+
+
+async def _run_agent(
+    prompt: str,
+    *,
+    timeout: int = 300,
+    verbose: bool = False,
+    allowed_tools: list[str] | None = None,
+    cwd: str | None = None,
+    max_turns: int | None = None,
+    system_prompt: str | None = None,
+) -> str:
     if query is None or ClaudeAgentOptions is None:
         raise RuntimeError("claude_agent_sdk is required")
 
     options = ClaudeAgentOptions(
-        allowed_tools=["Read", "Glob", "Grep"],
+        allowed_tools=allowed_tools or READ_ONLY_AGENT_TOOLS,
         permission_mode="bypassPermissions",
+        cwd=cwd,
+        max_turns=max_turns,
+        system_prompt=system_prompt,
     )
 
     async def _collect() -> str:
@@ -307,11 +386,145 @@ async def _run_agent(prompt: str, timeout: int = 300, verbose: bool = False) -> 
     return await _collect()
 
 
+def _parse_autonomous_result(raw: str) -> AgentAutonomyResult:
+    data = json.loads(_strip_code_fence(raw))
+    return AgentAutonomyResult.model_validate(data)
+
+
+def _collect_text_files(root: Path, max_file_kb: int = 512) -> dict[str, str]:
+    max_file_bytes = max_file_kb * 1024
+    files: dict[str, str] = {}
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        parts = set(path.relative_to(root).parts)
+        if parts.intersection(
+            {".git", "node_modules", ".venv", "venv", "dist", "build"}
+        ):
+            continue
+        if path.stat().st_size > max_file_bytes:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        rel = path.relative_to(root).as_posix()
+        files[rel] = text
+    return files
+
+
+def _build_unified_patch(
+    before: dict[str, str], after: dict[str, str]
+) -> tuple[str, list[str]]:
+    changed = sorted(set(before) | set(after))
+    patch_parts: list[str] = []
+    changed_files: list[str] = []
+    for rel in changed:
+        old = before.get(rel)
+        new = after.get(rel)
+        if old == new:
+            continue
+        changed_files.append(rel)
+        diff = difflib.unified_diff(
+            (old or "").splitlines(),
+            (new or "").splitlines(),
+            fromfile=f"a/{rel}",
+            tofile=f"b/{rel}",
+            lineterm="",
+        )
+        patch_parts.append("\n".join(diff))
+    return "\n\n".join(part for part in patch_parts if part), changed_files
+
+
+def _dockerfile_has_entrypoint_or_cmd(dockerfile_text: str) -> bool:
+    for line in dockerfile_text.splitlines():
+        upper = line.strip().upper()
+        if upper.startswith("ENTRYPOINT") or upper.startswith("CMD"):
+            return True
+    return False
+
+
+def _ensure_dockerfile_with_entrypoint(
+    repo_dir: Path,
+    dockerfile_path: str,
+    analysis: RepoAnalysis,
+    training_command: list[str],
+) -> str:
+    rel = dockerfile_path.strip() or "Dockerfile"
+    path = repo_dir / rel
+    if path.exists():
+        text = path.read_text(encoding="utf-8")
+        if _dockerfile_has_entrypoint_or_cmd(text):
+            return rel
+
+    if training_command:
+        cmd = json.dumps(training_command)
+        fallback = (
+            f"FROM {_docker_base(analysis.framework)}\n\n"
+            "WORKDIR /workspace\n"
+            "COPY . /workspace\n"
+            "RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi\n"
+            f"CMD {cmd}\n"
+        )
+    else:
+        fallback = _default_dockerfile(analysis)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(fallback, encoding="utf-8")
+    return rel
+
+
+def _resolve_container_builder() -> str | None:
+    docker_path = shutil.which("docker")
+    if docker_path:
+        return docker_path
+    podman_path = shutil.which("podman")
+    if podman_path:
+        return podman_path
+    return None
+
+
+def _build_container_image(
+    repo_dir: Path,
+    image_tag: str,
+    dockerfile_path: str,
+    timeout_s: int,
+) -> dict[str, Any]:
+    builder = _resolve_container_builder()
+    if not builder:
+        raise RuntimeError("neither docker nor podman is available in worker runtime")
+
+    dockerfile = Path(dockerfile_path)
+    if dockerfile.is_absolute():
+        dockerfile_arg = str(dockerfile)
+    else:
+        dockerfile_arg = str((repo_dir / dockerfile).resolve())
+    command = [builder, "build", "-f", dockerfile_arg, "-t", image_tag, "."]
+    result = subprocess.run(
+        command,
+        cwd=str(repo_dir),
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=max(120, timeout_s),
+    )
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip()
+        stdout = (result.stdout or "").strip()
+        raise RuntimeError(
+            f"image build failed with code {result.returncode}; "
+            f"stderr={_preview_text(stderr, 500)} stdout={_preview_text(stdout, 500)}"
+        )
+
+    return {
+        "builder": Path(builder).name,
+        "command": " ".join(command),
+        "image": image_tag,
+        "stdout_preview": _preview_text(result.stdout or "", 500),
+    }
+
+
 def _parse_analysis(raw: str) -> RepoAnalysis:
-    cleaned = raw.strip()
-    if cleaned.startswith("```"):
-        cleaned = cleaned.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-    data = json.loads(cleaned)
+    data = json.loads(_strip_code_fence(raw))
     return RepoAnalysis.model_validate(data)
 
 
@@ -469,7 +682,10 @@ def _dispatch_job_to_openshift(
     job_id: str,
     image: str,
     namespace: str,
-    decision: dict[str, Any],
+    analysis: RepoAnalysis,
+    allowed_geos: list[str],
+    max_price_usd_hour: float | None,
+    decision: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     try:
         from kubernetes import client as k8s_client
@@ -488,28 +704,59 @@ def _dispatch_job_to_openshift(
     labels = {
         "app": "repo-training",
         "job-id": job_id,
-        "energy.io/geo": str(decision.get("geo", "")),
-        "energy.io/provider": str(decision.get("provider", "")),
-        "energy.io/region": str(decision.get("region", "")),
-        "energy.io/sku": str(decision.get("sku", "")),
+        "energy-scheduling": "true",
     }
+    if isinstance(decision, dict):
+        for key in ("geo", "provider", "region", "sku"):
+            value = str(decision.get(key, "")).strip()
+            if value:
+                labels[f"energy.io/{key}"] = value
+
+    duration_s = max(3600, int(analysis.estimated_hours * 3600))
     annotations = {
-        "energy.io/window-start": str(decision.get("start_ts", "")),
-        "energy.io/window-end": str(decision.get("end_ts", "")),
-        "energy.io/score": str(decision.get("score", "")),
+        "energy.io/duration-s": str(duration_s),
+        "energy.io/min-gpu-memory-mib": str(max(1024, analysis.gpu_mem_gib * 1024)),
+        "energy.io/allowed-geos": ",".join(allowed_geos or ["FR", "DE", "ES"]),
     }
+    if max_price_usd_hour is not None:
+        annotations["energy.io/max-price-usd-hour"] = str(max_price_usd_hour)
+    if isinstance(decision, dict):
+        for key in ("start_ts", "end_ts", "score", "provider", "region", "sku"):
+            value = str(decision.get(key, "")).strip()
+            if not value:
+                continue
+            anno_key = {
+                "start_ts": "energy.io/window-start",
+                "end_ts": "energy.io/window-end",
+                "score": "energy.io/score",
+                "provider": "energy.io/provider",
+                "region": "energy.io/region",
+                "sku": "energy.io/sku",
+            }[key]
+            annotations[anno_key] = value
 
     env_items = [
         k8s_client.V1EnvVar(name="JOB_ID", value=job_id),
-        k8s_client.V1EnvVar(name="ENERGY_GEO", value=str(decision.get("geo", ""))),
         k8s_client.V1EnvVar(
-            name="ENERGY_PROVIDER", value=str(decision.get("provider", ""))
+            name="ENERGY_ALLOWED_GEOS", value=annotations["energy.io/allowed-geos"]
         ),
-        k8s_client.V1EnvVar(
-            name="ENERGY_REGION", value=str(decision.get("region", ""))
-        ),
-        k8s_client.V1EnvVar(name="ENERGY_SKU", value=str(decision.get("sku", ""))),
+        k8s_client.V1EnvVar(name="TRAINING_ENTRYPOINT", value=analysis.entrypoint),
     ]
+    if isinstance(decision, dict):
+        geo = str(decision.get("geo", "")).strip()
+        provider = str(decision.get("provider", "")).strip()
+        region = str(decision.get("region", "")).strip()
+        sku = str(decision.get("sku", "")).strip()
+        if geo:
+            env_items.append(k8s_client.V1EnvVar(name="ENERGY_GEO", value=geo))
+        if provider:
+            env_items.append(
+                k8s_client.V1EnvVar(name="ENERGY_PROVIDER", value=provider)
+            )
+        if region:
+            env_items.append(k8s_client.V1EnvVar(name="ENERGY_REGION", value=region))
+        if sku:
+            env_items.append(k8s_client.V1EnvVar(name="ENERGY_SKU", value=sku))
 
     pull_secret = os.getenv("IMAGE_PULL_SECRET", "").strip()
     image_pull_secrets = (
@@ -523,7 +770,7 @@ def _dispatch_job_to_openshift(
         env=env_items,
         resources=k8s_client.V1ResourceRequirements(
             requests={"cpu": "250m", "memory": "512Mi"},
-            limits={"cpu": "2", "memory": "4Gi"},
+            limits={"cpu": "2", "memory": "4Gi", "nvidia.com/gpu": analysis.gpu_count},
         ),
     )
 
@@ -554,8 +801,77 @@ def _dispatch_job_to_openshift(
 def _analyze_from_vfs(job_id: str, timeout: int, verbose: bool) -> RepoAnalysis:
     vfs = VirtualFileSystem.from_redis(_redis(), f"vfs:{job_id}")
     prompt = _build_agent_prompt(vfs)
-    raw = asyncio.run(_run_agent(prompt, timeout=timeout, verbose=verbose))
+    raw = asyncio.run(
+        _run_agent(
+            prompt,
+            timeout=timeout,
+            verbose=verbose,
+            allowed_tools=READ_ONLY_AGENT_TOOLS,
+        )
+    )
     return _parse_analysis(raw)
+
+
+def _autonomous_prepare_repo(
+    *,
+    repo_dir: Path,
+    job_id: str,
+    timeout: int,
+    verbose: bool,
+    selected_image: str | None,
+) -> tuple[RepoAnalysis, str, str, list[str], dict[str, Any], str]:
+    before_files = _collect_text_files(repo_dir)
+    prompt = _build_autonomous_code_prompt(job_id=job_id, selected_image=selected_image)
+    raw = asyncio.run(
+        _run_agent(
+            prompt,
+            timeout=max(timeout, 300),
+            verbose=verbose,
+            allowed_tools=CODE_AGENT_TOOLS,
+            cwd=str(repo_dir),
+            max_turns=60,
+        )
+    )
+    autonomy = _parse_autonomous_result(raw)
+    analysis = RepoAnalysis(
+        framework=autonomy.framework,
+        entrypoint=autonomy.entrypoint,
+        gpu_count=autonomy.gpu_count,
+        gpu_mem_gib=autonomy.gpu_mem_gib,
+        estimated_hours=autonomy.estimated_hours,
+        requires_dockerfile=autonomy.requires_dockerfile,
+        dependencies=autonomy.dependencies,
+        notes=autonomy.notes,
+    )
+    dockerfile_rel = _ensure_dockerfile_with_entrypoint(
+        repo_dir=repo_dir,
+        dockerfile_path=autonomy.dockerfile_path,
+        analysis=analysis,
+        training_command=autonomy.training_command,
+    )
+    after_files = _collect_text_files(repo_dir)
+    patch_text, changed_files = _build_unified_patch(before_files, after_files)
+    max_patch_chars = int(os.getenv("MAX_GENERATED_PATCH_CHARS", "200000"))
+    patch_truncated = False
+    if len(patch_text) > max_patch_chars:
+        patch_text = patch_text[:max_patch_chars] + "\n...<patch truncated>\n"
+        patch_truncated = True
+    dockerfile_content = (repo_dir / dockerfile_rel).read_text(encoding="utf-8")
+    autonomy_payload = {
+        "codecarbon_summary": autonomy.codecarbon_summary,
+        "training_command": autonomy.training_command,
+        "dockerfile_path": dockerfile_rel,
+        "changed_files": changed_files,
+        "patch_truncated": patch_truncated,
+    }
+    return (
+        analysis,
+        dockerfile_content,
+        dockerfile_rel,
+        changed_files,
+        autonomy_payload,
+        patch_text,
+    )
 
 
 def _generate_manifest_for_job(
@@ -591,12 +907,19 @@ def generate_manifest(self, payload: dict[str, Any]) -> dict[str, Any]:
 )
 def deploy_from_github(self, payload: dict[str, Any]) -> dict[str, Any]:
     inp = RepoSubmitPayload.model_validate(payload)
+    selected_image = inp.image or os.getenv("DEFAULT_TRAINING_IMAGE", "").strip()
+    if not selected_image:
+        image_repo = os.getenv(
+            "DEFAULT_IMAGE_REPO", "quay.io/drosel_ieu2022/hackeurope-train"
+        ).strip()
+        selected_image = f"{image_repo}:{inp.job_id}"
     _update_job(
         inp.job_id,
         status="queued",
         repo_url=inp.repo_url,
         branch=inp.branch,
         dry_run=inp.dry_run,
+        selected_image=selected_image,
         created_at=int(time.time()),
         celery_task_id=self.request.id,
     )
@@ -604,79 +927,113 @@ def deploy_from_github(self, payload: dict[str, Any]) -> dict[str, Any]:
     try:
         _update_job(inp.job_id, status="cloning")
         with tempfile.TemporaryDirectory(prefix=f"repo-{inp.job_id}-") as tmp_dir:
+            repo_dir = Path(tmp_dir)
             _clone_repo(inp.repo_url, inp.branch, tmp_dir)
-            vfs = VirtualFileSystem.from_directory(inp.repo_url, inp.branch, tmp_dir)
+            vfs = VirtualFileSystem.from_directory(inp.repo_url, inp.branch, repo_dir)
             vfs.to_redis(_redis(), f"vfs:{inp.job_id}", ttl_s=3600)
 
-        _update_job(inp.job_id, status="analyzing")
-        analysis = _analyze_from_vfs(
-            job_id=inp.job_id,
-            timeout=inp.timeout,
-            verbose=inp.verbose,
-        )
-
-        dockerfile_content = ""
-        if analysis.requires_dockerfile:
-            dockerfile_content = _default_dockerfile(analysis)
-
-        _update_job(inp.job_id, status="scheduling")
-        decision = _schedule_with_rails(
-            job_id=inp.job_id,
-            allowed_geos=inp.allowed_geos,
-            analysis=analysis,
-            max_price_usd_hour=inp.max_price_usd_hour,
-        )
-        if not decision:
-            decision = _schedule_choice(inp.allowed_geos)
-
-        _update_job(inp.job_id, status="generating_manifest")
-        manifest_yaml = _generate_manifest_for_job(
-            job_id=inp.job_id,
-            analysis=analysis,
-            allowed_geos=inp.allowed_geos,
-        )
-
-        cloud_mode = os.getenv("CLOUD_MODE", "mock").strip().lower()
-        selected_image = inp.image or os.getenv("DEFAULT_TRAINING_IMAGE", "").strip()
-        status = (
-            "prepared"
-            if inp.dry_run
-            else ("mock_dispatched" if cloud_mode == "mock" else "dispatched")
-        )
-        openshift_job: dict[str, Any] | None = None
-        if (not inp.dry_run) and cloud_mode != "mock":
-            if not selected_image:
-                raise RuntimeError("image is required when CLOUD_MODE is not mock")
-            _update_job(inp.job_id, status="dispatching", image=selected_image)
-            namespace = os.getenv("OPENSHIFT_NAMESPACE", "drosel-ieu2022-dev")
-            openshift_job = _dispatch_job_to_openshift(
+            _update_job(inp.job_id, status="agent_coding")
+            (
+                analysis,
+                dockerfile_content,
+                dockerfile_path,
+                changed_files,
+                autonomy_payload,
+                generated_patch,
+            ) = _autonomous_prepare_repo(
+                repo_dir=repo_dir,
                 job_id=inp.job_id,
-                image=selected_image,
-                namespace=namespace,
-                decision=decision,
+                timeout=inp.timeout,
+                verbose=inp.verbose,
+                selected_image=selected_image,
             )
 
-        _update_job(
-            inp.job_id,
-            status=status,
-            analysis=analysis.model_dump(),
-            scheduling_decision=decision,
-            manifest_yaml=manifest_yaml,
-            dockerfile_content=dockerfile_content,
-            selected_image=selected_image,
-            openshift_job=openshift_job or {},
-        )
+            prepared_vfs = VirtualFileSystem.from_directory(
+                inp.repo_url, inp.branch, repo_dir
+            )
+            prepared_vfs.to_redis(_redis(), f"vfs:{inp.job_id}:prepared", ttl_s=3600)
 
-        return {
-            "job_id": inp.job_id,
-            "status": status,
-            "analysis": analysis.model_dump(),
-            "scheduling_decision": decision,
-            "manifest_yaml": manifest_yaml,
-            "dockerfile_content": dockerfile_content,
-            "selected_image": selected_image,
-            "openshift_job": openshift_job,
-        }
+            _update_job(inp.job_id, status="building_image")
+            build_result: dict[str, Any] = {}
+            image_build_error = ""
+            try:
+                build_result = _build_container_image(
+                    repo_dir=repo_dir,
+                    image_tag=selected_image,
+                    dockerfile_path=dockerfile_path,
+                    timeout_s=max(inp.timeout, 300),
+                )
+            except Exception as exc:
+                image_build_error = str(exc)
+                if os.getenv("REQUIRE_IMAGE_BUILD", "false").strip().lower() in {
+                    "1",
+                    "true",
+                    "yes",
+                }:
+                    raise
+                log.warning("container build skipped: %s", exc)
+
+            _update_job(inp.job_id, status="generating_manifest")
+            manifest_yaml = _generate_manifest_for_job(
+                job_id=inp.job_id,
+                analysis=analysis,
+                allowed_geos=inp.allowed_geos,
+            )
+
+            decision: dict[str, Any] = {}
+            status = "prepared"
+            openshift_job: dict[str, Any] | None = None
+            bundle = {
+                "prepared_vfs_key": f"vfs:{inp.job_id}:prepared",
+                "source_vfs_key": f"vfs:{inp.job_id}",
+                "dockerfile_path": dockerfile_path,
+                "image": selected_image,
+                "changed_files_count": len(changed_files),
+                "manifest_ready": True,
+            }
+
+            _update_job(
+                inp.job_id,
+                status=status,
+                analysis=analysis.model_dump(),
+                scheduling_decision=decision,
+                manifest_yaml=manifest_yaml,
+                dockerfile_content=dockerfile_content,
+                dockerfile_path=dockerfile_path,
+                selected_image=selected_image,
+                allowed_geos=inp.allowed_geos,
+                max_price_usd_hour=inp.max_price_usd_hour,
+                confirmation_required=True,
+                dispatch_ready=True,
+                requested_dry_run=inp.dry_run,
+                openshift_job=openshift_job or {},
+                bundle=bundle,
+                changed_files=changed_files,
+                generated_patch=generated_patch,
+                codecarbon_integration=autonomy_payload,
+                image_build=build_result,
+                image_build_error=image_build_error,
+            )
+
+            return {
+                "job_id": inp.job_id,
+                "status": status,
+                "analysis": analysis.model_dump(),
+                "scheduling_decision": decision,
+                "manifest_yaml": manifest_yaml,
+                "dockerfile_content": dockerfile_content,
+                "dockerfile_path": dockerfile_path,
+                "selected_image": selected_image,
+                "openshift_job": openshift_job,
+                "bundle": bundle,
+                "changed_files": changed_files,
+                "generated_patch": generated_patch,
+                "codecarbon_integration": autonomy_payload,
+                "image_build": build_result,
+                "image_build_error": image_build_error,
+                "confirmation_required": True,
+                "dispatch_ready": True,
+            }
     except Exception as exc:
         log.exception("deploy_from_github failed")
         _update_job(inp.job_id, status="failed", error=str(exc))
@@ -690,9 +1047,31 @@ def execute_prepared(self, payload: dict[str, Any]) -> dict[str, Any]:
     if not job:
         raise RuntimeError(f"job not found: {inp.job_id}")
 
-    decision = job.get("scheduling_decision")
-    if not isinstance(decision, dict):
-        raise RuntimeError("scheduling_decision missing; prepare the job first")
+    try:
+        analysis = RepoAnalysis.model_validate(job.get("analysis") or {})
+    except Exception as exc:
+        raise RuntimeError("analysis missing; prepare the job first") from exc
+
+    allowed_geos_raw = job.get("allowed_geos")
+    allowed_geos: list[str]
+    if isinstance(allowed_geos_raw, list) and allowed_geos_raw:
+        allowed_geos = [
+            str(geo).upper() for geo in allowed_geos_raw if str(geo).strip()
+        ]
+    else:
+        allowed_geos = ["FR", "DE", "ES"]
+
+    max_price_raw = job.get("max_price_usd_hour")
+    max_price_usd_hour: float | None
+    if isinstance(max_price_raw, (int, float)):
+        max_price_usd_hour = float(max_price_raw)
+    elif isinstance(max_price_raw, str) and max_price_raw.strip():
+        try:
+            max_price_usd_hour = float(max_price_raw)
+        except Exception:
+            max_price_usd_hour = None
+    else:
+        max_price_usd_hour = None
 
     image = inp.image or str(job.get("selected_image") or "").strip()
     if not image:
@@ -704,11 +1083,29 @@ def execute_prepared(self, payload: dict[str, Any]) -> dict[str, Any]:
     _update_job(inp.job_id, status="dispatching", image=image)
 
     try:
+        pre_dispatch_decision: dict[str, Any] | None = None
+        if os.getenv(
+            "PRECOMPUTE_SCHEDULE_BEFORE_DISPATCH", "false"
+        ).strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }:
+            pre_dispatch_decision = _schedule_with_rails(
+                job_id=inp.job_id,
+                allowed_geos=allowed_geos,
+                analysis=analysis,
+                max_price_usd_hour=max_price_usd_hour,
+            )
+
         openshift_job = _dispatch_job_to_openshift(
             job_id=inp.job_id,
             image=image,
             namespace=namespace,
-            decision=decision,
+            analysis=analysis,
+            allowed_geos=allowed_geos,
+            max_price_usd_hour=max_price_usd_hour,
+            decision=pre_dispatch_decision,
         )
     except Exception as exc:
         _update_job(inp.job_id, status="failed", error=str(exc))
@@ -718,12 +1115,16 @@ def execute_prepared(self, payload: dict[str, Any]) -> dict[str, Any]:
         inp.job_id,
         status="dispatched",
         image=image,
+        scheduling_decision=pre_dispatch_decision or {},
         openshift_job=openshift_job,
+        confirmation_required=False,
+        dispatch_ready=False,
     )
     return {
         "job_id": inp.job_id,
         "status": "dispatched",
         "image": image,
+        "scheduling_decision": pre_dispatch_decision or {},
         "openshift_job": openshift_job,
     }
 

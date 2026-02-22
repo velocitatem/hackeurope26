@@ -32,3 +32,6 @@ torch
 tensorboard
 numpy
 onnxruntime
+joblib
+scikit-learn
+xgboost
