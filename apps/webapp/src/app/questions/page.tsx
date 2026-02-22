@@ -33,6 +33,14 @@ export default function QuestionsPage() {
       setCurrentStep(currentStep + 1);
       setValue(newAnswers[currentStep + 1] || "");
     } else {
+      const repoUrl = (newAnswers[0] ?? value)?.trim();
+      if (repoUrl) {
+        fetch("/api/prepare", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ repo_url: repoUrl }),
+        }).catch(() => {});
+      }
       const params = new URLSearchParams();
       if (newAnswers[0]) params.set("repo", newAnswers[0]);
       router.push(`/training?${params.toString()}`);

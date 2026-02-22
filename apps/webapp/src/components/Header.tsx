@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function Header() {
   return (
@@ -12,7 +13,8 @@ export default function Header() {
           <Link href="/dashboard" className="text-sm text-neutral-600 dark:text-neutral-300 hover:text-black dark:hover:text-white transition-colors">Dashboard</Link>
           <Link href="/blog" className="text-sm text-neutral-600 dark:text-neutral-300 hover:text-black dark:hover:text-white transition-colors">Blog</Link>
         </nav>
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-end gap-3">
+          <ThemeToggle />
           <Link href="/login" className="text-sm text-neutral-600 dark:text-neutral-300 hover:text-black dark:hover:text-white transition-colors">Sign In</Link>
         </div>
       </div>

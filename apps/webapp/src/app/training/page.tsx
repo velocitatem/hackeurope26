@@ -8,13 +8,13 @@ export default async function TrainingPage({
   const params = await searchParams
 
   return (
-    <div className="flex flex-col items-center px-4 py-12 min-h-screen">
-      <div className="w-full max-w-2xl space-y-8">
+    <div className="flex flex-col items-center px-4 py-16 min-h-screen">
+      <div className="w-full max-w-2xl space-y-10">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Configure Training</h1>
-          <p className="text-sm text-neutral-500">Set up your training parameters</p>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Configure Training</h1>
+          <p className="mt-1 text-base text-gray-500 dark:text-gray-400">Set up your training parameters</p>
         </div>
-        <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-6">
+        <div className="rounded-2xl border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-8 shadow-sm">
           <TrainingConfigClient initialRepo={params.repo} />
         </div>
       </div>

@@ -18,9 +18,15 @@ export default function HeroFlow({ initialRepo }: HeroFlowProps) {
     }
   }, [initialRepo]);
 
-  function handleRepoSubmit(url: string) {
-    setRepoUrl(url);
+  async function handleRepoSubmit(url: string) {
+    const trimmed = url.trim();
+    setRepoUrl(trimmed);
     setStep("config");
+    fetch("/api/prepare", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repo_url: trimmed }),
+    }).catch(() => {});
   }
 
   return (
