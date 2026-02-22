@@ -16,7 +16,14 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en">
+        <html lang="en" suppressHydrationWarning>
+            <head>
+                <script
+                    dangerouslySetInnerHTML={{
+                        __html: `(function(){var t=localStorage.getItem("theme");var d=window.matchMedia("(prefers-color-scheme: dark)").matches;var v=t||(d?"dark":"light");document.documentElement.classList.add(v);})();`,
+                    }}
+                />
+            </head>
             <body className={`${fontVariables} antialiased`}>
                 <Header />
                 <main className="min-h-screen">

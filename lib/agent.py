@@ -24,26 +24,58 @@ from typing import Iterator, AsyncIterator
 
 try:
     import anthropic
-
-    _client: anthropic.Anthropic | None = anthropic.Anthropic(
-        api_key=os.environ.get("ANTHROPIC_API_KEY")
-    )
-    _async_client: anthropic.AsyncAnthropic | None = anthropic.AsyncAnthropic(
-        api_key=os.environ.get("ANTHROPIC_API_KEY")
-    )
 except ImportError:
+    anthropic = None  # type: ignore[assignment]
     _client = None
     _async_client = None
+else:
+
+    def _clean_env(name: str) -> str:
+        value = (os.environ.get(name) or "").strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+            return value[1:-1].strip()
+        return value
+
+    def _resolve_anthropic_auth_token() -> str | None:
+        token = _clean_env("ANTHROPIC_AUTH_TOKEN")
+        if token:
+            return token
+        api_key = _clean_env("ANTHROPIC_API_KEY")
+        return api_key or None
+
+    def _resolve_anthropic_base_url() -> str | None:
+        value = _clean_env("ANTHROPIC_BASE_URL")
+        return value or None
+
+    _auth_token = _resolve_anthropic_auth_token()
+    _base_url = _resolve_anthropic_base_url()
+    _kwargs: dict[str, str] = {}
+    if _auth_token:
+        _kwargs["api_key"] = _auth_token
+    if _base_url:
+        _kwargs["base_url"] = _base_url
+
+    _client: anthropic.Anthropic | None = anthropic.Anthropic(**_kwargs)
+    _async_client: anthropic.AsyncAnthropic | None = anthropic.AsyncAnthropic(**_kwargs)
 
 
-DEFAULT_MODEL = "claude-sonnet-4-5"
+_base_env = (os.environ.get("ANTHROPIC_BASE_URL") or "").lower()
+_default_model_env = (os.environ.get("ANTHROPIC_DEFAULT_SONNET_MODEL") or "").strip()
+if _default_model_env:
+    DEFAULT_MODEL = _default_model_env
+elif "openrouter" in _base_env:
+    DEFAULT_MODEL = "openai/gpt-5-nano"
+else:
+    DEFAULT_MODEL = "claude-sonnet-4-5"
 
 
 def _require_client() -> "anthropic.Anthropic":
     if _client is None:
         raise ImportError("pip install anthropic")
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        raise RuntimeError("ANTHROPIC_API_KEY not set")
+    auth_token = (os.environ.get("ANTHROPIC_AUTH_TOKEN") or "").strip().strip("\"'")
+    api_key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip().strip("\"'")
+    if not auth_token and not api_key:
+        raise RuntimeError("Set ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY")
     return _client
 
 

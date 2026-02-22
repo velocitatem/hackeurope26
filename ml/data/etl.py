@@ -370,3 +370,7 @@ if __name__ == "__main__":
     for step in pipeline:
         last_step = step.fit_transform(last_step)
     df = last_step
+    # filter where in france or UK
+    df = df[df["location_name"].str.contains("Finland", case=False, na=False)]
+    print(df)
+    print(df["region"].value_counts())
