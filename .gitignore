@@ -1,11 +1,109 @@
-**/node_modules
+# Environment & secrets
 *.env
+.env.*
+!.env.example
+*.key
+*.pem
+config/master.key
+
+# Python
 .venv/
-**/__pycache__
+venv/
+env/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+**.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+*.mo
+*.pot
+
+# Node.js
+**/node_modules/
+**/package-lock.json
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+.pnp/
+.pnp.js
+
+# Build artifacts & binaries
+logs/
+*.log
+build/
+dist/
+target/
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+*.class
+*.jar
+*.war
+
+# IDEs & editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.iml
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Data & cache
 **/.scraper_cache/
 **/downloaded_files/
-**.egg-info/
-logs/
+*.sqlite3
+*.sqlite3-journal
+*.db
+.cache/
+*.tmp
+*.temp
+
+# ML & data science
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+*.joblib
+*.model
+*.weights
+*.ckpt
+*.pt
+*.pth
+wandb/
+mlruns/
+.neptune/
+
+# Session & temp files
+session-*
 FLAT.xml
 **/package-lock.json
 .vscode/settings.json
@@ -31,3 +129,40 @@ ml/data/weather-data/country_dfs
 ml/data/uk/uk-dataml/data/uk/uk-data/generation.csv
 ml/data/uk/uk-data/generation.csv
 ml/data/uk/uk-data/generation.csv
+session-*
+*.bak
+*.orig
+
+# Rails specific (for apps/backend/rails)
+apps/backend/rails/log/*.log
+apps/backend/rails/log/*.pid
+apps/backend/rails/tmp/**/*
+!apps/backend/rails/tmp/.keep
+!apps/backend/rails/tmp/pids/.keep
+!apps/backend/rails/tmp/cache/.keep
+!apps/backend/rails/tmp/storage/.keep
+!apps/backend/rails/tmp/sockets/.keep
+apps/backend/rails/storage/**/*
+!apps/backend/rails/storage/.keep
+apps/backend/rails/.bundle/
+apps/backend/rails/vendor/bundle/
+apps/backend/rails/public/assets/
+apps/backend/rails/public/packs/
+apps/backend/rails/app/
+apps/backend/rails/bin/
+apps/backend/rails/db/
+apps/backend/rails/config/
+
+# Docker
+*.pid
+.dockerenv
+
+# K8s secrets
+k8s/**/secrets/
+k8s/**/*secret*.yaml
+
+# Coverage & testing
+coverage/
+.nyc_output/
+test-results/
+*.coverage

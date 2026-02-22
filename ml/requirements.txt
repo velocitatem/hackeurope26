@@ -30,3 +30,10 @@ anthropic
 # ML (heavy - comment out if not needed)
 torch
 tensorboard
+numpy
+onnxruntime
+joblib
+scikit-learn
+xgboost
+pandas
+pyarrow
