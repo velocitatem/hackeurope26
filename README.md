@@ -15,6 +15,26 @@
 
 Project Sustain is a full-stack energy-aware training scheduler for GPU workloads. It combines a Python scheduling engine, Ruby on Rails control plane, FastAPI inference service, Next.js dashboard, and containerized runtime to place and reevaluate jobs across providers and regions.
 
+## Setup Requirements
+
+Minimum (local dev):
+
+- Linux/macOS (Windows via WSL2)
+- Docker Engine + Docker Compose v2
+- Python 3.12
+- Bun (for `apps/webapp`)
+
+Recommended for full end-to-end runs:
+
+- 8 CPU cores minimum
+- 16 GB RAM minimum
+- 60 GB free disk space recommended
+
+Optional (only if you run services outside Docker):
+
+- Ruby 3.4.8 + Bundler (Rails control plane)
+- `oc` CLI (OpenShift deployment flow)
+
 ## What it does
 
 Project Sustain schedules GPU training jobs using forecasted energy signals and live infrastructure data.
@@ -52,6 +72,89 @@ lib/                  Shared logger, scraper, and AI agent helpers
 src/                  Scheduler, models, signals, hooks, jobs
 k8s/openshift/        OpenShift manifests and job CRDs
 ```
+
+## End-to-End Quickstart
+
+This is the fastest path: run backend services in Docker and run the webapp locally.
+
+### 1) Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Set these values in `.env` for local end-to-end usage:
+
+```dotenv
+BACKEND_URL=http://localhost:9812
+RAILS_API_URL=http://localhost:3001
+NEXT_PUBLIC_REQUIRE_AUTH=false
+```
+
+### 2) Bootstrap local toolchain
+
+```bash
+make doctor
+make init
+```
+
+### 3) Start backend stack
+
+```bash
+make up
+docker compose up -d fastapi
+```
+
+`make up` starts `postgres`, `ml-inference`, `worker`, `rails`, and `scheduler`.
+The extra `docker compose` command starts `fastapi` for the dashboard/API flow.
+
+### 4) Start the webapp
+
+```bash
+make run.webapp
+```
+
+Then open `http://localhost:3000`.
+
+### 5) Verify services
+
+```bash
+curl http://localhost:3000/api/health
+curl http://localhost:9812/health
+curl http://localhost:3001/up
+curl http://localhost:8226/health
+```
+
+If these return healthy responses, the full flow is ready:
+
+1. Open the dashboard.
+2. Submit a GitHub repository.
+3. Track preparation/execution state and audit events.
+
+## Default Local Ports
+
+- Webapp: `3000`
+- FastAPI backend: `9812`
+- Rails control plane: `3001`
+- ML inference: `8226` (container port `8000`)
+- PostgreSQL: `5432`
+- Redis: `6378`
+
+## Useful Commands
+
+- `make ps` - show running containers
+- `make logs` - stream logs
+- `make down` - stop all services
+- `make test` - run Python tests
+- `make run.scheduler` - run scheduler loop locally
+- `make run.worker` - run Celery worker locally
+
+## OpenShift Deployment
+
+For cluster deployment flows, use:
+
+- `OPENSHIFT.md`
+- `k8s/openshift/README.md`
 
 ## Operational Notes
 
