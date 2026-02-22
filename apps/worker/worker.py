@@ -65,6 +65,7 @@ def _resolve_redis_url() -> str:
 
 
 REDIS_URL = _resolve_redis_url()
+SCHEDULING_MODE = os.getenv("SCHEDULING_MODE", "prepared").strip().lower()
 app = Celery("worker", broker=REDIS_URL, backend=REDIS_URL)
 
 
@@ -696,7 +697,7 @@ def _schedule_with_rails(
         "energy.io/min-gpu-memory-mib": str(analysis.gpu_mem_gib * 1024),
         "energy.io/allowed-geos": ",".join(allowed_geos),
     }
-    if max_price_usd_hour is not None:
+    if max_price_usd_hour is not None and max_price_usd_hour > 0:
         annotations["energy.io/max-price-usd-hour"] = str(max_price_usd_hour)
 
     review = {
@@ -728,6 +729,7 @@ def _schedule_with_rails(
     }
 
     try:
+        log.info("calling rails webhook at %s for job %s", url, job_id)
         response = requests.post(url, json=review, timeout=30)
         response.raise_for_status()
         body = response.json()
@@ -735,10 +737,18 @@ def _schedule_with_rails(
             body.get("response", {}).get("patch") if isinstance(body, dict) else None
         )
         if not isinstance(patch, str) or not patch:
+            log.warning(
+                "rails returned no patch for job %s (status=%s)",
+                job_id,
+                response.status_code,
+            )
             return None
-        return _parse_rails_patch_decision(patch)
+        decision = _parse_rails_patch_decision(patch)
+        if decision:
+            log.info("rails scheduling decision for %s: %s", job_id, decision)
+        return decision
     except Exception as exc:
-        log.warning("rails scheduling request failed: %s", exc)
+        log.warning("rails scheduling request to %s failed: %s", url, exc)
         return None
 
 
@@ -751,6 +761,7 @@ def _dispatch_job_to_openshift(
     allowed_geos: list[str],
     max_price_usd_hour: float | None,
     decision: dict[str, Any] | None = None,
+    scheduling_mode: str = "prepared",
 ) -> dict[str, Any]:
     name = _job_name(job_id)
     auth_required = _env_flag("OPENSHIFT_AUTH_REQUIRED", default=False)
@@ -768,6 +779,7 @@ def _dispatch_job_to_openshift(
                 "image": image,
                 "dispatched": False,
                 "mode": "planned",
+                "scheduling_mode": scheduling_mode,
                 "reason": reason,
             }
         raise RuntimeError(
@@ -795,30 +807,35 @@ def _dispatch_job_to_openshift(
                     "image": image,
                     "dispatched": False,
                     "mode": "planned",
+                    "scheduling_mode": scheduling_mode,
                     "reason": reason,
                 }
             raise RuntimeError(reason) from kubeconfig_exc
 
+    # -- Labels --
     labels = {
         "app": "repo-training",
         "job-id": job_id,
         "energy-scheduling": "true",
     }
-    if isinstance(decision, dict):
-        for key in ("geo", "provider", "region", "sku"):
-            value = str(decision.get(key, "")).strip()
-            if value:
-                labels[f"energy.io/{key}"] = value
 
+    # -- Annotations (base) --
     duration_s = max(3600, int(analysis.estimated_hours * 3600))
-    annotations = {
+    annotations: dict[str, str] = {
         "energy.io/duration-s": str(duration_s),
         "energy.io/min-gpu-memory-mib": str(max(1024, analysis.gpu_mem_gib * 1024)),
         "energy.io/allowed-geos": ",".join(allowed_geos or ["FR", "DE", "ES"]),
+        "energy.io/decision-source": scheduling_mode,
     }
-    if max_price_usd_hour is not None:
+    if max_price_usd_hour is not None and max_price_usd_hour > 0:
         annotations["energy.io/max-price-usd-hour"] = str(max_price_usd_hour)
+
+    # -- Scheduling decision fields (prepared mode bakes them in) --
+    node_selector: dict[str, str] | None = None
+    scheduler_name = "default-scheduler"
+
     if isinstance(decision, dict):
+        # Propagate decision into annotations
         for key in ("start_ts", "end_ts", "score", "provider", "region", "sku"):
             value = str(decision.get(key, "")).strip()
             if not value:
@@ -833,29 +850,38 @@ def _dispatch_job_to_openshift(
             }[key]
             annotations[anno_key] = value
 
+        # In prepared mode, set nodeSelector and schedulerName directly
+        if scheduling_mode == "prepared":
+            scheduler_name = "secondary-scheduler"
+            selector: dict[str, str] = {}
+            for sel_key in ("geo", "provider", "region", "sku"):
+                sel_val = str(decision.get(sel_key, "")).strip()
+                if sel_val:
+                    selector[f"energy.io/{sel_key}"] = sel_val
+            if selector:
+                node_selector = selector
+
+    # -- Env vars --
     env_items = [
         k8s_client.V1EnvVar(name="JOB_ID", value=job_id),
         k8s_client.V1EnvVar(
             name="ENERGY_ALLOWED_GEOS", value=annotations["energy.io/allowed-geos"]
         ),
         k8s_client.V1EnvVar(name="TRAINING_ENTRYPOINT", value=analysis.entrypoint),
+        k8s_client.V1EnvVar(name="SCHEDULING_MODE", value=scheduling_mode),
     ]
     if isinstance(decision, dict):
-        geo = str(decision.get("geo", "")).strip()
-        provider = str(decision.get("provider", "")).strip()
-        region = str(decision.get("region", "")).strip()
-        sku = str(decision.get("sku", "")).strip()
-        if geo:
-            env_items.append(k8s_client.V1EnvVar(name="ENERGY_GEO", value=geo))
-        if provider:
-            env_items.append(
-                k8s_client.V1EnvVar(name="ENERGY_PROVIDER", value=provider)
-            )
-        if region:
-            env_items.append(k8s_client.V1EnvVar(name="ENERGY_REGION", value=region))
-        if sku:
-            env_items.append(k8s_client.V1EnvVar(name="ENERGY_SKU", value=sku))
+        for env_key, env_name in (
+            ("geo", "ENERGY_GEO"),
+            ("provider", "ENERGY_PROVIDER"),
+            ("region", "ENERGY_REGION"),
+            ("sku", "ENERGY_SKU"),
+        ):
+            env_val = str(decision.get(env_key, "")).strip()
+            if env_val:
+                env_items.append(k8s_client.V1EnvVar(name=env_name, value=env_val))
 
+    # -- Container --
     pull_secret = os.getenv("IMAGE_PULL_SECRET", "").strip()
     image_pull_secrets = (
         [k8s_client.V1LocalObjectReference(name=pull_secret)] if pull_secret else None
@@ -880,13 +906,19 @@ def _dispatch_job_to_openshift(
         ),
     )
 
+    # -- Pod spec --
+    pod_spec = k8s_client.V1PodSpec(
+        restart_policy="Never",
+        containers=[container],
+        image_pull_secrets=image_pull_secrets,
+        scheduler_name=scheduler_name,
+    )
+    if node_selector:
+        pod_spec.node_selector = node_selector
+
     template = k8s_client.V1PodTemplateSpec(
         metadata=k8s_client.V1ObjectMeta(labels=labels, annotations=annotations),
-        spec=k8s_client.V1PodSpec(
-            restart_policy="Never",
-            containers=[container],
-            image_pull_secrets=image_pull_secrets,
-        ),
+        spec=pod_spec,
     )
 
     job = k8s_client.V1Job(
@@ -909,6 +941,7 @@ def _dispatch_job_to_openshift(
                 "image": image,
                 "dispatched": False,
                 "mode": "planned",
+                "scheduling_mode": scheduling_mode,
                 "reason": reason,
             }
         raise
@@ -919,6 +952,7 @@ def _dispatch_job_to_openshift(
         "image": image,
         "dispatched": True,
         "mode": "openshift",
+        "scheduling_mode": scheduling_mode,
         "auth_mode": auth_mode,
     }
 
@@ -1208,20 +1242,21 @@ def execute_prepared(self, payload: dict[str, Any]) -> dict[str, Any]:
     _update_job(inp.job_id, status="dispatching", image=image)
 
     try:
-        pre_dispatch_decision: dict[str, Any] | None = None
-        if os.getenv(
-            "PRECOMPUTE_SCHEDULE_BEFORE_DISPATCH", "false"
-        ).strip().lower() in {
-            "1",
-            "true",
-            "yes",
-        }:
-            pre_dispatch_decision = _schedule_with_rails(
+        decision: dict[str, Any] | None = None
+        if SCHEDULING_MODE == "prepared":
+            _update_job(inp.job_id, status="scheduling")
+            decision = _schedule_with_rails(
                 job_id=inp.job_id,
                 allowed_geos=allowed_geos,
                 analysis=analysis,
                 max_price_usd_hour=max_price_usd_hour,
             )
+            if decision is None:
+                log.warning(
+                    "rails scheduling unavailable for %s; using static fallback",
+                    inp.job_id,
+                )
+                decision = _schedule_choice(allowed_geos)
 
         openshift_job = _dispatch_job_to_openshift(
             job_id=inp.job_id,
@@ -1230,7 +1265,8 @@ def execute_prepared(self, payload: dict[str, Any]) -> dict[str, Any]:
             analysis=analysis,
             allowed_geos=allowed_geos,
             max_price_usd_hour=max_price_usd_hour,
-            decision=pre_dispatch_decision,
+            decision=decision,
+            scheduling_mode=SCHEDULING_MODE,
         )
     except Exception as exc:
         _update_job(inp.job_id, status="failed", error=str(exc))
@@ -1244,7 +1280,8 @@ def execute_prepared(self, payload: dict[str, Any]) -> dict[str, Any]:
         inp.job_id,
         status=status,
         image=image,
-        scheduling_decision=pre_dispatch_decision or {},
+        scheduling_mode=SCHEDULING_MODE,
+        scheduling_decision=decision or {},
         openshift_job=openshift_job,
         confirmation_required=False,
         dispatch_ready=not dispatched,
@@ -1253,8 +1290,9 @@ def execute_prepared(self, payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "job_id": inp.job_id,
         "status": status,
+        "scheduling_mode": SCHEDULING_MODE,
         "image": image,
-        "scheduling_decision": pre_dispatch_decision or {},
+        "scheduling_decision": decision or {},
         "openshift_job": openshift_job,
         "dispatch_error": dispatch_reason,
     }
