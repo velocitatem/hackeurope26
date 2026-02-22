@@ -1,0 +1,26 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: energy-scheduler-webhook
+webhooks:
+  - name: energy-scheduler.hackeurope26.local
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    failurePolicy: Ignore
+    matchPolicy: Equivalent
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+    namespaceSelector: {}
+    objectSelector:
+      matchLabels:
+        energy-scheduling: "true"
+    clientConfig:
+      service:
+        namespace: hackeurope26
+        name: rails-control-plane
+        path: /webhook/pods
+        port: 3001
+      caBundle: ""

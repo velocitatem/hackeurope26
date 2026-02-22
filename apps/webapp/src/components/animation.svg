@@ -1,0 +1,277 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 550" width="100%" height="100%" style="font-family: system-ui, -apple-system, sans-serif; background-color: #f8fafc;">
+  
+  <defs>
+    <!-- Shadows -->
+    <filter id="shadow-sm" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.05" />
+    </filter>
+    <filter id="shadow-md" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.1" />
+    </filter>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Gradients for Energy Charts -->
+    <linearGradient id="energyGrad" x1="0" y1="0" x2="0" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="49%" stop-color="#10b981" />
+      <stop offset="51%" stop-color="#f59e0b" />
+    </linearGradient>
+    
+    <linearGradient id="energyGradFill" x1="0" y1="0" x2="0" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="49%" stop-color="#10b981" stop-opacity="0.2" />
+      <stop offset="51%" stop-color="#f59e0b" stop-opacity="0.2" />
+    </linearGradient>
+
+    <!-- ML Job Gradient -->
+    <linearGradient id="jobGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+
+    <!-- Clip Paths for Charts -->
+    <clipPath id="chart-clip">
+      <rect x="0" y="0" width="200" height="120" rx="4" />
+    </clipPath>
+
+    <!-- Reusable Chart Grid -->
+    <g id="chart-grid">
+      <!-- Forecast Area Background -->
+      <rect x="50" y="0" width="150" height="120" fill="#f1f5f9" opacity="0.5" />
+      <!-- Zero Line -->
+      <line x1="0" y1="60" x2="200" y2="60" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="4 4" />
+      <!-- NOW Line -->
+      <line x1="50" y1="0" x2="50" y2="120" stroke="#3b82f6" stroke-width="2" stroke-dasharray="3 3" />
+      <text x="50" y="15" fill="#3b82f6" font-size="10" font-weight="bold" text-anchor="middle" letter-spacing="1">NOW</text>
+      <!-- Axis Labels -->
+      <text x="10" y="25" fill="#10b981" font-size="12" font-weight="bold">+</text>
+      <text x="10" y="105" fill="#f59e0b" font-size="14" font-weight="bold">-</text>
+    </g>
+
+    <!-- Data Center Rack Icon -->
+    <g id="rack-icon">
+      <rect x="0" y="0" width="40" height="50" rx="3" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.5" />
+      <rect x="5" y="5" width="30" height="10" rx="1.5" fill="#ffffff" stroke="#94a3b8" />
+      <circle cx="12" cy="10" r="2" fill="#10b981">
+        <animate attributeName="opacity" values="1;0.2;1" dur="1.5s" repeatCount="indefinite" />
+      </circle>
+      <rect x="5" y="20" width="30" height="10" rx="1.5" fill="#ffffff" stroke="#94a3b8" />
+      <circle cx="12" cy="25" r="2" fill="#10b981">
+        <animate attributeName="opacity" values="1;0.2;1" dur="2s" repeatCount="indefinite" />
+      </circle>
+      <rect x="5" y="35" width="30" height="10" rx="1.5" fill="#ffffff" stroke="#94a3b8" />
+      <circle cx="12" cy="40" r="2" fill="#10b981">
+        <animate attributeName="opacity" values="1;0.2;1" dur="1s" repeatCount="indefinite" />
+      </circle>
+    </g>
+  </defs>
+
+  <!-- ================= BACKGROUND & HEADER ================= -->
+  <rect width="100%" height="100%" fill="#f8fafc" />
+  
+  <text x="400" y="35" fill="#0f172a" font-size="20" font-weight="800" text-anchor="middle" letter-spacing="-0.5">Energy-Surplus–Aware Adaptive Scheduler</text>
+  <text x="400" y="55" fill="#64748b" font-size="13" font-weight="500" text-anchor="middle">Dynamic ML placement &amp; seamless migration based on delta(t) = production(t) − demand(t)</text>
+
+  <!-- ================= CHARTS SECTION (TOP) ================= -->
+  
+  <!-- Chart 1: France (FR) -->
+  <g transform="translate(50, 80)">
+    <rect width="200" height="120" rx="6" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" filter="url(#shadow-sm)" />
+    <text x="100" y="-8" fill="#334155" font-size="12" font-weight="bold" text-anchor="middle">eu-west (FR) Delta Forecast</text>
+    
+    <g clip-path="url(#chart-clip)">
+      <use href="#chart-grid" />
+      <g>
+        <animateTransform attributeName="transform" type="translate" values="0,0; -300,0" dur="10s" repeatCount="indefinite" />
+        <!-- FR Area Path (Surplus drops to Deficit at x=150) -->
+        <path d="M 0,60 L 0,20 L 100,20 C 130,20 150,100 180,100 L 270,100 C 285,100 295,20 300,20 L 400,20 C 430,20 450,100 480,100 L 570,100 C 585,100 595,20 600,20 L 600,60 Z" fill="url(#energyGradFill)" />
+        <!-- FR Line Path -->
+        <path d="M 0,20 L 100,20 C 130,20 150,100 180,100 L 270,100 C 285,100 295,20 300,20 L 400,20 C 430,20 450,100 480,100 L 570,100 C 585,100 595,20 600,20" fill="none" stroke="url(#energyGrad)" stroke-width="3" />
+      </g>
+    </g>
+  </g>
+
+  <!-- Chart 2: Germany (DE) -->
+  <g transform="translate(300, 80)">
+    <rect width="200" height="120" rx="6" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" filter="url(#shadow-sm)" />
+    <text x="100" y="-8" fill="#334155" font-size="12" font-weight="bold" text-anchor="middle">eu-central (DE) Delta Forecast</text>
+    
+    <g clip-path="url(#chart-clip)">
+      <use href="#chart-grid" />
+      <g>
+        <animateTransform attributeName="transform" type="translate" values="0,0; -300,0" dur="10s" repeatCount="indefinite" />
+        <!-- DE Area Path (Deficit rises to Surplus at x=150) -->
+        <path d="M 0,60 L 0,100 L 100,100 C 130,100 150,20 180,20 L 270,20 C 285,20 295,100 300,100 L 400,100 C 430,100 450,20 480,20 L 570,20 C 585,20 595,100 600,100 L 600,60 Z" fill="url(#energyGradFill)" />
+        <!-- DE Line Path -->
+        <path d="M 0,100 L 100,100 C 130,100 150,20 180,20 L 270,20 C 285,20 295,100 300,100 L 400,100 C 430,100 450,20 480,20 L 570,20 C 585,20 595,100 600,100" fill="none" stroke="url(#energyGrad)" stroke-width="3" />
+      </g>
+    </g>
+  </g>
+
+  <!-- Chart 3: Spain (ES) -->
+  <g transform="translate(550, 80)">
+    <rect width="200" height="120" rx="6" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" filter="url(#shadow-sm)" />
+    <text x="100" y="-8" fill="#334155" font-size="12" font-weight="bold" text-anchor="middle">eu-south (ES) Delta Forecast</text>
+    
+    <g clip-path="url(#chart-clip)">
+      <use href="#chart-grid" />
+      <g>
+        <animateTransform attributeName="transform" type="translate" values="0,0; -300,0" dur="10s" repeatCount="indefinite" />
+        <!-- ES Area Path (Stays relatively flat/low) -->
+        <path d="M 0,60 L 0,80 Q 75,100 150,80 Q 225,60 300,80 Q 375,100 450,80 Q 525,60 600,80 L 600,60 Z" fill="url(#energyGradFill)" />
+        <path d="M 0,80 Q 75,100 150,80 Q 225,60 300,80 Q 375,100 450,80 Q 525,60 600,80" fill="none" stroke="url(#energyGrad)" stroke-width="3" />
+      </g>
+    </g>
+  </g>
+
+
+  <!-- ================= INFRASTRUCTURE / DATA CENTERS (BOTTOM) ================= -->
+  
+  <!-- Global Network Line Connecting DCs -->
+  <line x1="150" y1="360" x2="650" y2="360" stroke="#cbd5e1" stroke-width="3" stroke-dasharray="6 6" />
+  
+  <!-- Migration Activity Path (Hidden by default, shows during migration) -->
+  <g>
+    <animate attributeName="opacity" values="0; 0; 1; 0; 0" keyTimes="0; 0.35; 0.4; 0.45; 1" dur="10s" repeatCount="indefinite" />
+    <line x1="150" y1="360" x2="400" y2="360" stroke="#6366f1" stroke-width="4" stroke-dasharray="8 8">
+      <animate attributeName="stroke-dashoffset" from="16" to="0" dur="0.4s" repeatCount="indefinite" />
+    </line>
+    <!-- Little data packets -->
+    <circle cx="200" cy="360" r="4" fill="#6366f1" filter="url(#glow)">
+      <animate attributeName="cx" values="150;400" dur="1s" repeatCount="indefinite" />
+    </circle>
+  </g>
+
+  <!-- FR Data Center -->
+  <g transform="translate(60, 310)">
+    <rect width="180" height="100" rx="8" fill="#ffffff" stroke="#e2e8f0" stroke-width="2" filter="url(#shadow-md)" />
+    <!-- Status Indicator Outline (Green when active) -->
+    <rect width="180" height="100" rx="8" fill="none" stroke="#10b981" stroke-width="3">
+      <animate attributeName="opacity" values="1; 1; 0; 0; 1" keyTimes="0; 0.35; 0.4; 0.95; 1" dur="10s" repeatCount="indefinite" />
+    </rect>
+    <text x="90" y="25" fill="#0f172a" font-size="14" font-weight="bold" text-anchor="middle">Region: eu-west</text>
+    <text x="90" y="42" fill="#64748b" font-size="11" text-anchor="middle">Hardware: 8x A100</text>
+    <use href="#rack-icon" x="40" y="45" />
+    <use href="#rack-icon" x="100" y="45" />
+  </g>
+
+  <!-- DE Data Center -->
+  <g transform="translate(310, 310)">
+    <rect width="180" height="100" rx="8" fill="#ffffff" stroke="#e2e8f0" stroke-width="2" filter="url(#shadow-md)" />
+    
+    <!-- Warm-start Glow Box (Orange) -->
+    <rect width="180" height="100" rx="8" fill="none" stroke="#f59e0b" stroke-width="4">
+      <animate attributeName="opacity" values="0; 0; 1; 1; 0; 0; 0" keyTimes="0; 0.25; 0.28; 0.38; 0.4; 0.95; 1" dur="10s" repeatCount="indefinite" />
+    </rect>
+    
+    <!-- Active Glow Box (Green) -->
+    <rect width="180" height="100" rx="8" fill="none" stroke="#10b981" stroke-width="3">
+      <animate attributeName="opacity" values="0; 0; 1; 1; 0" keyTimes="0; 0.38; 0.4; 0.95; 1" dur="10s" repeatCount="indefinite" />
+    </rect>
+
+    <text x="90" y="25" fill="#0f172a" font-size="14" font-weight="bold" text-anchor="middle">Region: eu-central</text>
+    <text x="90" y="42" fill="#64748b" font-size="11" text-anchor="middle">Hardware: 8x A100</text>
+    <use href="#rack-icon" x="40" y="45" />
+    <use href="#rack-icon" x="100" y="45" />
+
+    <!-- Warm-start overlay label -->
+    <g>
+      <animate attributeName="opacity" values="0; 0; 1; 1; 0; 0" keyTimes="0; 0.25; 0.28; 0.38; 0.4; 1" dur="10s" repeatCount="indefinite" />
+      <rect x="25" y="-15" width="130" height="24" rx="12" fill="#f59e0b" filter="url(#glow)" />
+      <text x="90" y="1" fill="#ffffff" font-size="10" font-weight="bold" text-anchor="middle" letter-spacing="1">WARM-STARTING</text>
+    </g>
+  </g>
+
+  <!-- ES Data Center -->
+  <g transform="translate(560, 310)">
+    <rect width="180" height="100" rx="8" fill="#ffffff" stroke="#e2e8f0" stroke-width="2" filter="url(#shadow-md)" />
+    <text x="90" y="25" fill="#0f172a" font-size="14" font-weight="bold" text-anchor="middle">Region: eu-south</text>
+    <text x="90" y="42" fill="#64748b" font-size="11" text-anchor="middle">Hardware: Offline</text>
+    <use href="#rack-icon" x="40" y="45" opacity="0.4" />
+    <use href="#rack-icon" x="100" y="45" opacity="0.4" />
+  </g>
+
+
+  <!-- ================= THE ML JOB PAYLOAD ================= -->
+  
+  <g>
+    <!-- Master Translation Animation -->
+    <animateTransform attributeName="transform" type="translate" values="80,240; 80,240; 330,240; 330,240; 80,240" keyTimes="0; 0.35; 0.45; 0.95; 1" dur="10s" repeatCount="indefinite" />
+    
+    <!-- Master Opacity Animation to hide the "snap back" -->
+    <animate attributeName="opacity" values="1; 1; 0; 0; 1" keyTimes="0; 0.94; 0.95; 0.99; 1" dur="10s" repeatCount="indefinite" />
+
+    <!-- Job Box -->
+    <rect width="140" height="60" rx="8" fill="url(#jobGrad)" filter="url(#shadow-md)" />
+    
+    <!-- State Label -->
+    <g transform="translate(70, -10)">
+      <rect x="-40" y="-12" width="80" height="20" rx="10" fill="#ffffff" stroke="#6366f1" stroke-width="1.5" />
+      <text x="0" y="2" font-size="10" font-weight="bold" fill="#4f46e5" text-anchor="middle">
+        <tspan>
+          <animate attributeName="opacity" values="1;1;0;0;1" keyTimes="0;0.34;0.35;0.45;1" dur="10s" repeatCount="indefinite"/>
+          Running
+        </tspan>
+        <tspan x="0" y="2" opacity="0">
+          <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.34;0.35;0.45;1" dur="10s" repeatCount="indefinite"/>
+          Migrating...
+        </tspan>
+        <tspan x="0" y="2" opacity="0">
+          <animate attributeName="opacity" values="0;0;0;1;0" keyTimes="0;0.44;0.45;0.94;1" dur="10s" repeatCount="indefinite"/>
+          Running
+        </tspan>
+      </text>
+    </g>
+
+    <!-- GPU / Brain icon approximation -->
+    <rect x="10" y="10" width="24" height="24" rx="4" fill="#ffffff" fill-opacity="0.2" />
+    <circle cx="22" cy="22" r="4" fill="#ffffff" />
+    <path d="M 16 22 L 28 22 M 22 16 L 22 28" stroke="#ffffff" stroke-width="2" />
+
+    <!-- Job Details -->
+    <text x="42" y="20" fill="#ffffff" font-size="11" font-weight="bold">Job: ResNet-101</text>
+    <text x="42" y="34" fill="#e0e7ff" font-size="9">Epoch Progress</text>
+    
+    <!-- Progress Bar inside Job Box -->
+    <rect x="10" y="44" width="120" height="6" rx="3" fill="#3730a3" />
+    <rect x="10" y="44" width="0" height="6" rx="3" fill="#34d399">
+      <animate attributeName="width" values="10; 40; 45; 45; 110; 120; 10" keyTimes="0; 0.35; 0.4; 0.45; 0.94; 0.95; 1" dur="10s" repeatCount="indefinite" />
+    </rect>
+  </g>
+
+
+  <!-- ================= SYSTEM LOG / ACTION CONSOLE (BOTTOM) ================= -->
+  
+  <g transform="translate(50, 460)">
+    <!-- Console Background -->
+    <rect width="700" height="50" rx="8" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="1.5" />
+    <!-- Little terminal dots -->
+    <circle cx="20" cy="25" r="4" fill="#10b981" />
+    
+    <!-- Log Line 1: Placement -->
+    <text x="35" y="29" fill="#0f172a" font-size="13" font-family="monospace">
+      <animate attributeName="opacity" values="1; 1; 0; 0" keyTimes="0; 0.25; 0.26; 1" dur="10s" repeatCount="indefinite" />
+      <tspan fill="#64748b">[00:00]</tspan> <tspan fill="#0284c7">Placement Plan:</tspan> Assigned to FR due to sustained surplus delta(t).
+    </text>
+    
+    <!-- Log Line 2: Alert / Forecast Evaluation -->
+    <text x="35" y="29" fill="#0f172a" font-size="13" font-family="monospace" opacity="0">
+      <animate attributeName="opacity" values="0; 0; 1; 1; 0; 0" keyTimes="0; 0.25; 0.26; 0.34; 0.35; 1" dur="10s" repeatCount="indefinite" />
+      <tspan fill="#64748b">[00:45]</tspan> <tspan fill="#f59e0b">Adaptive Alert:</tspan> FR surplus ending. DE surplus rising. Triggering Warm-start...
+    </text>
+    
+    <!-- Log Line 3: Migration -->
+    <text x="35" y="29" fill="#0f172a" font-size="13" font-family="monospace" opacity="0">
+      <animate attributeName="opacity" values="0; 0; 1; 1; 0; 0" keyTimes="0; 0.34; 0.35; 0.44; 0.45; 1" dur="10s" repeatCount="indefinite" />
+      <tspan fill="#64748b">[01:00]</tspan> <tspan fill="#6366f1">Migration:</tspan> Checkpointing model state &amp; transferring to DE...
+    </text>
+
+    <!-- Log Line 4: Resumed -->
+    <text x="35" y="29" fill="#0f172a" font-size="13" font-family="monospace" opacity="0">
+      <animate attributeName="opacity" values="0; 0; 1; 1; 0" keyTimes="0; 0.44; 0.45; 0.98; 1" dur="10s" repeatCount="indefinite" />
+      <tspan fill="#64748b">[01:15]</tspan> <tspan fill="#10b981">Resumed:</tspan> Training continues in DE. 100% green energy maintained.
+    </text>
+  </g>
+
+</svg>

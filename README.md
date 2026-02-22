@@ -1,4 +1,6 @@
-# Ultiplate
+# Project Sustain
+
+![](./output.gif)
 
 Template for any project: SaaS webapp, API server, ML pipeline, scraper, CLI, or background worker. AI-native, platform-agnostic, managed via Makefile.
 
@@ -50,6 +52,10 @@ src/               Simple scripts / CLI entry points
 | `make lift.minio` | Start MinIO object storage |
 | `make lift.logging` | Start Loki + Grafana |
 | `make lift.database` | Start Postgres / MongoDB |
+| `make openshift.login` | Login to remote OpenShift cluster |
+| `make openshift.demo.nyc` | Submit NYC taxi dummy job |
+| `make openshift.machinesets.render` | Generate EU provider MachineSets |
+| `make openshift.machinesets.apply` | Apply MachineSets + autoscalers |
 | `make doctor` | Verify toolchain |
 
 Run `make help` for the full list.
@@ -89,7 +95,7 @@ from lib import get_logger
 logger = get_logger("service")
 ```
 
-Outputs structured JSON to console + `./logs/`. Optional Loki push when `LOKI_PORT` is set and `make lift.logging` is running. View in Grafana at `http://localhost:$GRAFANA_PORT` (add Loki data source: `http://loki:3100`).
+Outputs structured JSON to console + `./logs/`.
 
 ## Services (docker compose profiles)
 
