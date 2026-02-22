@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -19,7 +20,7 @@ from typing import Any
 
 from celery import Celery
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 import redis
 import requests
 
@@ -108,6 +109,54 @@ class AgentAutonomyResult(BaseModel):
     dockerfile_path: str = "Dockerfile"
     training_command: list[str] = Field(default_factory=list)
     codecarbon_summary: str = ""
+
+    @field_validator("dockerfile_path", mode="before")
+    @classmethod
+    def _normalize_dockerfile_path(cls, value: object) -> str:
+        text = str(value or "").strip()
+        return text or "Dockerfile"
+
+    @field_validator("dependencies", mode="before")
+    @classmethod
+    def _normalize_dependencies(cls, value: object) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return [str(item).strip() for item in value if str(item).strip()]
+        text = str(value).strip()
+        if not text:
+            return []
+        if "," in text:
+            return [part.strip() for part in text.split(",") if part.strip()]
+        if "\n" in text:
+            return [part.strip() for part in text.splitlines() if part.strip()]
+        return [text]
+
+    @field_validator("training_command", mode="before")
+    @classmethod
+    def _normalize_training_command(cls, value: object) -> list[str]:
+        def _tokens(text: str) -> list[str]:
+            stripped = text.strip()
+            if not stripped:
+                return []
+            try:
+                parts = shlex.split(stripped)
+            except Exception:
+                parts = stripped.split()
+            return [part for part in parts if part.strip()]
+
+        if value is None:
+            return []
+        if isinstance(value, list):
+            cleaned = [str(item).strip() for item in value if str(item).strip()]
+            if len(cleaned) == 1:
+                parsed = _tokens(cleaned[0])
+                if parsed:
+                    return parsed
+            return cleaned
+        if isinstance(value, str):
+            return _tokens(value)
+        return _tokens(str(value))
 
 
 READ_ONLY_AGENT_TOOLS = ["Read", "Glob", "Grep"]
@@ -387,7 +436,16 @@ async def _run_agent(
 
 
 def _parse_autonomous_result(raw: str) -> AgentAutonomyResult:
-    data = json.loads(_strip_code_fence(raw))
+    cleaned = _strip_code_fence(raw)
+    try:
+        data = json.loads(cleaned)
+    except Exception:
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start >= 0 and end > start:
+            data = json.loads(cleaned[start : end + 1])
+        else:
+            raise
     return AgentAutonomyResult.model_validate(data)
 
 

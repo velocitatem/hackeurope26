@@ -35,3 +35,5 @@ onnxruntime
 joblib
 scikit-learn
 xgboost
+pandas
+pyarrow

@@ -1,4 +1,3 @@
-import json
 import math
 import os
 import re
@@ -23,34 +22,37 @@ try:
 except Exception:
     joblib = None
 
+try:
+    import pandas as pd
+except Exception:
+    pd = None
+
 
 SECONDS_PER_DAY = 60 * 60 * 24
 SECONDS_PER_HOUR = 60 * 60
-SUPPORTED_GEOS = ("UK", "FR", "FIN")
+SUPPORTED_GEOS = ("UK", "FR", "FIN", "IT")
 GEO_ALIASES = {
     "GB": "UK",
     "FRANCE": "FR",
     "FI": "FIN",
     "FINLAND": "FIN",
+    "ITALY": "IT",
 }
 MODEL_FILE_RE = re.compile(r"gap_horizon_(\d+)h\.onnx$")
+FEATURE_FILE_RE = re.compile(r"([a-z]{2,3})_x_test_set\.parquet$")
 
 
 class PredictInput(BaseModel):
-    geo: Literal["UK", "FR", "FIN"]
+    geo: Literal["UK", "FR", "FIN", "IT"]
     t: float
     horizon_h: int = 1
-    feature_vector: list[float] | None = None
-    features: dict[str, float] | None = None
 
 
 class PredictSeriesInput(BaseModel):
-    geo: Literal["UK", "FR", "FIN"]
+    geo: Literal["UK", "FR", "FIN", "IT"]
     start: float
     horizon_s: int = 48 * 60 * 60
     freq_s: int = 30 * 60
-    feature_vectors: list[list[float]] | None = None
-    features_list: list[dict[str, float]] | None = None
 
 
 class UKOnnxBundle:
@@ -119,6 +121,9 @@ class TabularCountryModels:
                     "ML_FIN_MODEL_PATH", str(base_dir / "fin" / "fin_model.joblib")
                 )
             ),
+            "IT": Path(
+                os.getenv("ML_IT_MODEL_PATH", str(base_dir / "it" / "it_model.joblib"))
+            ),
         }
         self.models: dict[str, Any] = {}
         self.load_errors: dict[str, str] = {}
@@ -161,6 +166,67 @@ class TabularCountryModels:
 
         return None
 
+
+class QuantifidFeatureStore:
+    def __init__(self) -> None:
+        self.feature_dir = Path(
+            os.getenv(
+                "ML_FEATURES_DIR",
+                str(Path(__file__).resolve().parent / "features_quantifid"),
+            )
+        )
+        self.vectors: dict[str, list[list[float]]] = {}
+        self.feature_count: dict[str, int] = {}
+        self.load_errors: dict[str, str] = {}
+        self._load()
+
+    def _load(self) -> None:
+        if pd is None:
+            self.load_errors["GLOBAL"] = "missing dependency: pandas"
+            return
+        if not self.feature_dir.exists():
+            self.load_errors["GLOBAL"] = (
+                f"feature directory not found: {self.feature_dir}"
+            )
+            return
+
+        for candidate in sorted(self.feature_dir.glob("*_x_test_set.parquet")):
+            match = FEATURE_FILE_RE.search(candidate.name)
+            if match is None:
+                continue
+            geo = match.group(1).upper()
+            if geo == "FI":
+                geo = "FIN"
+            try:
+                df = pd.read_parquet(candidate)
+                if df.empty:
+                    self.load_errors[geo] = f"feature set empty: {candidate.name}"
+                    continue
+                prepared = df.copy()
+                for col in prepared.columns:
+                    series = prepared[col]
+                    if getattr(series.dtype, "kind", "") == "M":
+                        prepared[col] = series.astype("int64") / 1_000_000_000.0
+                    else:
+                        prepared[col] = pd.to_numeric(series, errors="coerce")
+                prepared = prepared.fillna(0.0)
+                matrix = prepared.astype("float32").values.tolist()
+                self.vectors[geo] = matrix
+                self.feature_count[geo] = int(len(matrix[0]))
+            except Exception as exc:
+                self.load_errors[geo] = f"failed to load features: {exc}"
+
+    def has_geo(self, geo: str) -> bool:
+        return geo in self.vectors and len(self.vectors[geo]) > 0
+
+    def vector_for(self, geo: str, t: float, horizon_h: int) -> list[float]:
+        rows = self.vectors.get(geo)
+        if not rows:
+            raise ValueError(f"no hardcoded feature vectors for {geo}")
+        seed = int(max(0.0, t)) // SECONDS_PER_HOUR
+        idx = int((seed + max(1, horizon_h)) % len(rows))
+        return rows[idx]
+
     def feature_names(self, geo: str) -> list[str] | None:
         model = self.models.get(geo)
         if model is None:
@@ -180,6 +246,7 @@ class TabularCountryModels:
 
 _UK_MODELS = UKOnnxBundle()
 _TABULAR_MODELS = TabularCountryModels()
+_FEATURE_STORE = QuantifidFeatureStore()
 
 
 def _normalize_geo(geo: str) -> str:
@@ -236,58 +303,24 @@ def _predict_uk_delta(t: float, horizon_h: int) -> tuple[float, int]:
     return delta, selected_h
 
 
-def _feature_vector_from_named_features(
-    geo: str, named_features: dict[str, float]
-) -> list[float]:
-    feature_names = _TABULAR_MODELS.feature_names(geo)
-    if not feature_names:
-        raise ValueError(
-            "model does not expose feature names; send 'feature_vector' instead"
-        )
-
-    missing = [name for name in feature_names if name not in named_features]
-    if missing:
-        preview = ", ".join(missing[:10])
-        suffix = "" if len(missing) <= 10 else f" ... (+{len(missing) - 10} more)"
-        raise ValueError(f"missing required features: {preview}{suffix}")
-
-    return [float(named_features[name]) for name in feature_names]
-
-
-def _resolve_feature_vector(
-    geo: str,
-    feature_vector: list[float] | None,
-    features: dict[str, float] | None,
-) -> list[float]:
+def _resolve_feature_vector(geo: str, t: float, horizon_h: int) -> list[float]:
+    vector = _FEATURE_STORE.vector_for(geo=geo, t=t, horizon_h=horizon_h)
     expected = _TABULAR_MODELS.required_features(geo)
-
-    if feature_vector is not None:
-        if expected is not None and len(feature_vector) != expected:
-            raise ValueError(
-                f"feature_vector length mismatch: got {len(feature_vector)}, expected {expected}"
-            )
-        return [float(v) for v in feature_vector]
-
-    if features is not None:
-        return _feature_vector_from_named_features(geo=geo, named_features=features)
-
-    suffix = f" of length {expected}" if expected else ""
-    raise ValueError(
-        "missing model inputs for tabular model: send 'feature_vector'"
-        f"{suffix} or send full named 'features'"
-    )
+    if expected is not None and len(vector) != expected:
+        if len(vector) < expected:
+            vector = [*vector, *([0.0] * (expected - len(vector)))]
+        else:
+            vector = vector[:expected]
+    return [float(v) for v in vector]
 
 
 def _predict_tabular_delta(
     geo: str,
+    t: float,
     horizon_h: int,
-    feature_vector: list[float] | None,
-    features: dict[str, float] | None,
 ) -> tuple[float, int]:
     model = _TABULAR_MODELS.get_model(geo)
-    vector = _resolve_feature_vector(
-        geo=geo, feature_vector=feature_vector, features=features
-    )
+    vector = _resolve_feature_vector(geo=geo, t=t, horizon_h=horizon_h)
     x = np.asarray([vector], dtype=np.float32)
 
     y = model.predict(x)
@@ -306,88 +339,49 @@ def _predict_tabular_series(
     start: float,
     horizon_s: int,
     freq_s: int,
-    feature_vectors: list[list[float]] | None,
-    features_list: list[dict[str, float]] | None,
 ) -> list[dict[str, float]]:
-    if feature_vectors is not None and features_list is not None:
-        raise ValueError("send either feature_vectors or features_list, not both")
-
-    points_count = (horizon_s // freq_s) + 1
-
-    if feature_vectors is not None and len(feature_vectors) != points_count:
-        raise ValueError(
-            f"feature_vectors length mismatch: got {len(feature_vectors)}, expected {points_count}"
-        )
-
-    if features_list is not None and len(features_list) != points_count:
-        raise ValueError(
-            f"features_list length mismatch: got {len(features_list)}, expected {points_count}"
-        )
-
-    if feature_vectors is None and features_list is None:
-        raise ValueError(
-            "series inference for tabular models requires feature_vectors or features_list"
-        )
-
     points = []
-    for index, offset in enumerate(range(0, horizon_s + 1, freq_s)):
+    for offset in range(0, horizon_s + 1, freq_s):
         t = start + float(offset)
         requested_h = max(
             1, int(math.ceil((offset + freq_s) / float(SECONDS_PER_HOUR)))
         )
-        vector = feature_vectors[index] if feature_vectors is not None else None
-        named = features_list[index] if features_list is not None else None
         delta, used_h = _predict_tabular_delta(
             geo=geo,
+            t=t,
             horizon_h=requested_h,
-            feature_vector=vector,
-            features=named,
         )
         points.append({"t": t, "delta": float(delta), "horizon_h": used_h})
 
     return points
 
 
-def _use_mock_mode_for_geo(geo: str) -> bool:
-    env_flag = os.getenv("ML_MOCK", "false").strip().lower() == "true"
-    if env_flag:
-        return True
+def _geo_readiness_error(geo: str) -> str | None:
+    if np is None:
+        return "numpy is required for inference"
     if geo == "UK":
-        return not _UK_MODELS.models_loaded
-    if geo in ("FR", "FIN"):
-        return not _TABULAR_MODELS.is_loaded(geo)
-    return True
-
-
-def _parse_feature_vector_csv(feature_vector_csv: str | None) -> list[float] | None:
-    if not feature_vector_csv:
+        if not _UK_MODELS.models_loaded:
+            return _UK_MODELS.load_error or "UK ONNX models are not loaded"
         return None
-    try:
-        return [
-            float(chunk.strip())
-            for chunk in feature_vector_csv.split(",")
-            if chunk.strip()
-        ]
-    except Exception as exc:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid feature_vector_csv, expected comma-separated floats: {exc}",
-        ) from exc
-
-
-def _parse_features_json(features_json: str | None) -> dict[str, float] | None:
-    if not features_json:
+    if geo in ("FR", "FIN", "IT"):
+        if not _TABULAR_MODELS.is_loaded(geo):
+            return _TABULAR_MODELS.load_errors.get(
+                geo, f"{geo} tabular model is not loaded"
+            )
+        if not _FEATURE_STORE.has_geo(geo):
+            return _FEATURE_STORE.load_errors.get(
+                geo, f"{geo} hardcoded feature vectors are not loaded"
+            )
         return None
-    try:
-        payload = json.loads(features_json)
-        if not isinstance(payload, dict):
-            raise ValueError("JSON payload must be an object")
-        return {str(k): float(v) for k, v in payload.items()}
-    except Exception as exc:
+    return f"unsupported geo '{geo}'"
+
+
+def _ensure_geo_ready(geo: str) -> None:
+    err = _geo_readiness_error(geo)
+    if err:
         raise HTTPException(
-            status_code=400,
-            detail=f"Invalid features_json, expected JSON object of numeric values: {exc}",
-        ) from exc
+            status_code=503, detail=f"Inference unavailable for {geo}: {err}"
+        )
 
 
 app = FastAPI(title="ML Inference API", version="1.1.0")
@@ -399,12 +393,17 @@ def health_check() -> dict:
     tabular_required = {
         geo: _TABULAR_MODELS.required_features(geo) for geo in loaded_tabular_geos
     }
+    readiness = {
+        geo: {
+            "ready": _geo_readiness_error(geo) is None,
+            "error": _geo_readiness_error(geo),
+        }
+        for geo in SUPPORTED_GEOS
+    }
     return {
         "status": "healthy",
         "service": "ml-inference",
-        "mode": "mock"
-        if os.getenv("ML_MOCK", "false").strip().lower() == "true"
-        else "model",
+        "mode": "model-only",
         "uk": {
             "model_dir": str(_UK_MODELS.model_dir),
             "loaded_horizons_h": sorted(_UK_MODELS.sessions.keys()),
@@ -415,48 +414,36 @@ def health_check() -> dict:
             "required_features": tabular_required,
             "load_errors": _TABULAR_MODELS.load_errors,
         },
+        "hardcoded_feature_vectors": {
+            "feature_dir": str(_FEATURE_STORE.feature_dir),
+            "loaded_geos": sorted(_FEATURE_STORE.vectors.keys()),
+            "feature_count": _FEATURE_STORE.feature_count,
+            "load_errors": _FEATURE_STORE.load_errors,
+        },
+        "readiness": readiness,
     }
 
 
 @app.get("/predict/delta")
 def predict_delta(
-    geo: str = Query(..., description="Geography code: UK, FR, FIN"),
+    geo: str = Query(..., description="Geography code: UK, FR, FIN, IT"),
     t: float = Query(..., description="Epoch timestamp in seconds"),
     horizon_h: int = Query(1, ge=1, le=24, description="Forecast horizon in hours"),
-    feature_vector_csv: str | None = Query(
-        None,
-        description="Comma-separated feature vector for FR/FIN tabular models",
-    ),
-    features_json: str | None = Query(
-        None,
-        description="JSON object of named features for FR/FIN tabular models",
-    ),
 ) -> dict:
     geo_norm = _normalize_geo(geo)
     if geo_norm not in SUPPORTED_GEOS:
         raise HTTPException(status_code=400, detail=f"Unsupported geo '{geo}'")
-
-    if _use_mock_mode_for_geo(geo_norm):
-        return {
-            "geo": geo_norm,
-            "t": t,
-            "horizon_h": horizon_h,
-            "delta": _mock_delta_at(t),
-            "source": "mock_sinusoidal",
-        }
+    _ensure_geo_ready(geo_norm)
 
     try:
         if geo_norm == "UK":
             delta, used_h = _predict_uk_delta(t=t, horizon_h=horizon_h)
             source = f"onnx_gap_horizon_{used_h}h"
         else:
-            feature_vector = _parse_feature_vector_csv(feature_vector_csv)
-            features = _parse_features_json(features_json)
             delta, used_h = _predict_tabular_delta(
                 geo=geo_norm,
+                t=t,
                 horizon_h=horizon_h,
-                feature_vector=feature_vector,
-                features=features,
             )
             source = f"joblib_{geo_norm.lower()}_gap_model"
     except HTTPException:
@@ -478,24 +465,18 @@ def predict_delta(
 @app.post("/predict/delta")
 def predict_delta_post(payload: PredictInput) -> dict:
     geo_norm = _normalize_geo(payload.geo)
+    if geo_norm not in SUPPORTED_GEOS:
+        raise HTTPException(status_code=400, detail=f"Unsupported geo '{payload.geo}'")
+    _ensure_geo_ready(geo_norm)
+
     if geo_norm == "UK":
         return predict_delta(geo=geo_norm, t=payload.t, horizon_h=payload.horizon_h)
-
-    if _use_mock_mode_for_geo(geo_norm):
-        return {
-            "geo": geo_norm,
-            "t": payload.t,
-            "horizon_h": payload.horizon_h,
-            "delta": _mock_delta_at(payload.t),
-            "source": "mock_sinusoidal",
-        }
 
     try:
         delta, used_h = _predict_tabular_delta(
             geo=geo_norm,
+            t=payload.t,
             horizon_h=payload.horizon_h,
-            feature_vector=payload.feature_vector,
-            features=payload.features,
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -511,7 +492,7 @@ def predict_delta_post(payload: PredictInput) -> dict:
 
 @app.get("/predict/delta/series")
 def predict_delta_series(
-    geo: str = Query(..., description="Geography code: UK, FR, FIN"),
+    geo: str = Query(..., description="Geography code: UK, FR, FIN, IT"),
     start: float = Query(..., description="Start epoch timestamp in seconds"),
     horizon_s: int = Query(48 * 60 * 60, ge=60, le=7 * 24 * 60 * 60),
     freq_s: int = Query(30 * 60, ge=60, le=6 * 60 * 60),
@@ -519,31 +500,26 @@ def predict_delta_series(
     geo_norm = _normalize_geo(geo)
     if geo_norm not in SUPPORTED_GEOS:
         raise HTTPException(status_code=400, detail=f"Unsupported geo '{geo}'")
-
-    if geo_norm in ("FR", "FIN") and not _use_mock_mode_for_geo(geo_norm):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Series inference for {geo_norm} requires per-step tabular features. "
-                "Use POST /predict/delta with 'feature_vector' or 'features'."
-            ),
-        )
+    _ensure_geo_ready(geo_norm)
 
     points = []
     for offset in range(0, horizon_s + 1, freq_s):
         t = start + float(offset)
-        if _use_mock_mode_for_geo(geo_norm):
-            points.append({"t": t, "delta": _mock_delta_at(t), "horizon_h": 1})
-            continue
-
         requested_h = max(
             1, int(math.ceil((offset + freq_s) / float(SECONDS_PER_HOUR)))
         )
         try:
-            delta, used_h = _predict_uk_delta(t=t, horizon_h=requested_h)
+            if geo_norm == "UK":
+                delta, used_h = _predict_uk_delta(t=t, horizon_h=requested_h)
+            else:
+                delta, used_h = _predict_tabular_delta(
+                    geo=geo_norm,
+                    t=t,
+                    horizon_h=requested_h,
+                )
         except Exception as exc:
             raise HTTPException(
-                status_code=500, detail=f"ONNX inference failed: {exc}"
+                status_code=500, detail=f"Model inference failed: {exc}"
             ) from exc
         points.append({"t": t, "delta": delta, "horizon_h": used_h})
 
@@ -553,9 +529,9 @@ def predict_delta_series(
         "horizon_s": horizon_s,
         "freq_s": freq_s,
         "series": points,
-        "source": "mock_sinusoidal"
-        if _use_mock_mode_for_geo(geo_norm)
-        else "onnx_gap_horizon_ensemble",
+        "source": "onnx_gap_horizon_ensemble"
+        if geo_norm == "UK"
+        else f"joblib_{geo_norm.lower()}_gap_model",
     }
 
 
@@ -592,8 +568,6 @@ def predict_delta_series_post(payload: PredictSeriesInput) -> dict:
             start=payload.start,
             horizon_s=payload.horizon_s,
             freq_s=payload.freq_s,
-            feature_vectors=payload.feature_vectors,
-            features_list=payload.features_list,
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
