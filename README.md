@@ -1,112 +1,110 @@
 # Project Sustain
 
-![](./output.gif)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Next.js 15](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![Ruby on Rails](https://img.shields.io/badge/Ruby_on_Rails-Control_Plane-CC0000?logo=rubyonrails&logoColor=white)](https://rubyonrails.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
+[![OpenShift Ready](https://img.shields.io/badge/OpenShift-Ready-EE0000?logo=redhatopenshift&logoColor=white)](https://www.redhat.com/en/technologies/cloud-computing/openshift)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)](https://redis.io/)
 
-Template for any project: SaaS webapp, API server, ML pipeline, scraper, CLI, or background worker. AI-native, platform-agnostic, managed via Makefile.
+<p align="center">
+  <img src="./output.gif" alt="Project Sustain demo" width="920" />
+</p>
 
-## Quick Start
+Project Sustain is a full-stack energy-aware training scheduler for GPU workloads. It combines a Python scheduling engine, Ruby on Rails control plane, FastAPI inference service, Next.js dashboard, and containerized runtime to place and reevaluate jobs across providers and regions.
+
+## What is implemented
+
+- Scheduler core in `src/` with deterministic scoring and migration checks.
+- Ruby on Rails control-plane integration for jobs, decisions, and migration events.
+- ML inference API in `ml/inference.py` serving ONNX horizon models with mock fallback.
+- Inventory loader from `ml/data/` covering provider sites and pricing.
+- Web surfaces: Next.js dashboard (`apps/webapp`) and Streamlit prototype (`apps/webapp-minimal`).
+- Docker Compose stack for local orchestration and OpenShift manifests for cluster deployment.
+
+## Architecture
+
+`Scheduler (Python)` -> `ML Inference (FastAPI/ONNX)` + `Inventory Loader` -> `Decision + Score` -> `Rails API` -> `Dashboard`
+
+Core score:
+
+`score = SCHED_W_DELTA * avg_delta + SCHED_W_COST * normalized_cost`
+
+Default weights:
+
+- `SCHED_W_DELTA=0.70`
+- `SCHED_W_COST=0.30`
+- `SCHED_MIGRATION_THRESHOLD=0.2`
+- `SCHED_EVAL_EVERY_N_EPOCHS=10`
+
+## Quick start
 
 ```bash
-cp .env.example .env        # fill in NAME and any keys you need
-make init                   # venv + python deps + env linking
-make dev                    # Next.js webapp at http://localhost:3000
-```
-
-For Docker services (redis, ml inference, worker):
-```bash
+cp .env.example .env
+make init
 make up
 ```
 
-## Directory
+Common dev commands:
 
-```
-apps/
-  webapp/          Next.js 15 + React 19 + Tailwind 4 + Supabase auth (Bun, Turbopack)
-  webapp-minimal/  Streamlit quick prototype
-  backend/
-    fastapi/       FastAPI server (set BACKEND_MODE=fastapi)
-    flask/         Flask server  (set BACKEND_MODE=flask)
-  worker/          Celery background worker backed by Redis
-ml/
-  models/          arch.py (architecture) + train.py (training loop)
-  data/            etl.py - raw -> PyTorch dataset pipeline
-  inference.py     FastAPI inference server
-  notebooks/       Jupyter notebooks
-lib/               Shared Python utilities (logger, scraper, agent)
-src/               Simple scripts / CLI entry points
+```bash
+make dev            # Next.js app on :3000
+make run.scheduler  # scheduler loop
+make run.ml         # ML inference API
+make run.backend    # FastAPI or Flask backend
+make test           # pytest
 ```
 
-## Make Targets
+## Services
 
-| Target | Description |
-|--------|-------------|
-| `make init` | First-time setup |
-| `make dev` | Start Next.js webapp |
-| `make up` | Start Docker core services |
-| `make run.backend` | Start API backend |
-| `make run.worker` | Start Celery worker |
-| `make ai.agent` | Open Claude Code session |
-| `make ai.plan IDEA="..."` | Get a build plan from Claude |
-| `make ai.build TASK="..."` | Agentic build session |
-| `make ai.review` | Review recent git changes |
-| `make lift.minio` | Start MinIO object storage |
-| `make lift.logging` | Start Loki + Grafana |
-| `make lift.database` | Start Postgres / MongoDB |
-| `make openshift.login` | Login to remote OpenShift cluster |
-| `make openshift.demo.nyc` | Submit NYC taxi dummy job |
-| `make openshift.machinesets.render` | Generate EU provider MachineSets |
-| `make openshift.machinesets.apply` | Apply MachineSets + autoscalers |
-| `make doctor` | Verify toolchain |
+Default `make up` stack:
 
-Run `make help` for the full list.
+- `postgres`
+- `rails`
+- `ml-inference`
+- `worker`
+- `scheduler`
+- `redis`
 
-## AI Agent Capacity
+Optional profiles:
 
-Set `ANTHROPIC_API_KEY` in `.env`. Then use:
+- `make lift.minio`
+- `make lift.tensorboard`
+- `make lift.logging`
+- `make lift.database`
+
+## Repository layout
+
+```text
+apps/webapp/          Next.js 15 + React 19 + Tailwind 4 + Supabase auth
+apps/webapp-minimal/  Streamlit prototype
+apps/backend/         FastAPI, Flask, and Rails control-plane apps
+apps/worker/          Celery worker
+ml/                   Inference API, models, and ETL data
+lib/                  Shared logger, scraper, and AI agent helpers
+src/                  Scheduler, models, signals, hooks, jobs
+k8s/openshift/        OpenShift manifests and job CRDs
+```
+
+## AI utilities
+
+Set `ANTHROPIC_API_KEY` in `.env` and use:
 
 ```python
 from lib import ask, stream, Agent
-
-# One-shot
-print(ask("Summarize this data: ..."))
-
-# Streaming
-for chunk in stream("Write a Celery task that ..."):
-    print(chunk, end="", flush=True)
-
-# Multi-turn
-agent = Agent(system="You are a senior Python developer.")
-agent.chat("Scaffold a FastAPI endpoint for user profiles")
-agent.chat("Add input validation and error handling")
 ```
 
-Claude Code slash commands (type `/` in a Claude Code session):
-- `/plan` - implementation plan for an idea within this boilerplate
-- `/build` - implement a feature end-to-end
-- `/api` - scaffold a new backend endpoint
-- `/page` - scaffold a new Next.js page
-- `/review` - code review of recent changes
-- `/ship` - stage and commit changes
+Useful Make targets:
 
-## Logging
+- `make ai.agent`
+- `make ai.plan IDEA="..."`
+- `make ai.build TASK="..."`
+- `make ai.review`
 
-```python
-from lib import get_logger
-logger = get_logger("service")
-```
+## Notes
 
-Outputs structured JSON to console + `./logs/`.
-
-## Services (docker compose profiles)
-
-| Profile | Services | Command |
-|---------|----------|---------|
-| _(default)_ | redis, ml-inference, worker | `make up` |
-| `minio` | + MinIO object storage | `make lift.minio` |
-| `tensorboard` | + TensorBoard | `make lift.tensorboard` |
-| `logging` | + Loki + Grafana | `make lift.logging` |
-| `database` | + Postgres + MongoDB | `make lift.database` |
-
-## Webapp Auth
-
-Auth is off by default (`NEXT_PUBLIC_REQUIRE_AUTH=false`). Set it to `true` and configure Supabase keys to enable session-based auth gating across all routes.
+- Scheduler geographies are configured through `SCHED_GEOS` (EU defaults in `src/config.py`).
+- Current ONNX inference endpoint supports `UK` (with `GB` alias) and falls back to mock mode when models/dependencies are unavailable.
+- Structured JSON logs are written to `./logs/` via `lib/logger.py`.
