@@ -1,0 +1,9 @@
+.dashboard-shell ~ footer,
+body:has(.dashboard-shell) > header,
+body:has(.dashboard-shell) > footer {
+  display: none;
+}
+
+body:has(.dashboard-shell) > main {
+  min-height: 100vh;
+}
