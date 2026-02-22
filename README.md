@@ -15,14 +15,15 @@
 
 Project Sustain is a full-stack energy-aware training scheduler for GPU workloads. It combines a Python scheduling engine, Ruby on Rails control plane, FastAPI inference service, Next.js dashboard, and containerized runtime to place and reevaluate jobs across providers and regions.
 
-## What is implemented
+## What it does
 
-- Scheduler core in `src/` with deterministic scoring and migration checks.
-- Ruby on Rails control-plane integration for jobs, decisions, and migration events.
-- ML inference API in `ml/inference.py` serving ONNX horizon models with mock fallback.
-- Inventory loader from `ml/data/` covering provider sites and pricing.
-- Web surfaces: Next.js dashboard (`apps/webapp`) and Streamlit prototype (`apps/webapp-minimal`).
-- Docker Compose stack for local orchestration and OpenShift manifests for cluster deployment.
+Project Sustain schedules GPU training jobs using forecasted energy signals and live infrastructure data.
+
+- Forecast carbon-intensity deltas over time windows.
+- Join forecasts with live multi-cloud GPU inventory and price signals.
+- Produce deterministic placement decisions with explicit scoring rationale.
+- Reevaluate placements during training and emit migration recommendations.
+- Persist state and events through a Rails control plane for observability.
 
 ## Architecture
 
@@ -39,43 +40,7 @@ Default weights:
 - `SCHED_MIGRATION_THRESHOLD=0.2`
 - `SCHED_EVAL_EVERY_N_EPOCHS=10`
 
-## Quick start
-
-```bash
-cp .env.example .env
-make init
-make up
-```
-
-Common dev commands:
-
-```bash
-make dev            # Next.js app on :3000
-make run.scheduler  # scheduler loop
-make run.ml         # ML inference API
-make run.backend    # FastAPI or Flask backend
-make test           # pytest
-```
-
-## Services
-
-Default `make up` stack:
-
-- `postgres`
-- `rails`
-- `ml-inference`
-- `worker`
-- `scheduler`
-- `redis`
-
-Optional profiles:
-
-- `make lift.minio`
-- `make lift.tensorboard`
-- `make lift.logging`
-- `make lift.database`
-
-## Repository layout
+## System
 
 ```text
 apps/webapp/          Next.js 15 + React 19 + Tailwind 4 + Supabase auth
@@ -88,22 +53,7 @@ src/                  Scheduler, models, signals, hooks, jobs
 k8s/openshift/        OpenShift manifests and job CRDs
 ```
 
-## AI utilities
-
-Set `ANTHROPIC_API_KEY` in `.env` and use:
-
-```python
-from lib import ask, stream, Agent
-```
-
-Useful Make targets:
-
-- `make ai.agent`
-- `make ai.plan IDEA="..."`
-- `make ai.build TASK="..."`
-- `make ai.review`
-
-## Notes
+## Operational Notes
 
 - Scheduler geographies are configured through `SCHED_GEOS` (EU defaults in `src/config.py`).
 - Current ONNX inference endpoint supports `UK` (with `GB` alias) and falls back to mock mode when models/dependencies are unavailable.

@@ -310,6 +310,18 @@ def _env_flag(name: str, default: bool = False) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _effective_gpu_count(requested: int) -> int:
+    override_raw = os.getenv("GPU_COUNT_OVERRIDE", "").strip()
+    if override_raw:
+        try:
+            return max(0, int(override_raw))
+        except Exception:
+            pass
+    if _env_flag("DISABLE_GPU_REQUESTS", default=False):
+        return 0
+    return max(0, int(requested))
+
+
 def _extract_content_text(content: object) -> str | None:
     if isinstance(content, str):
         return content
@@ -691,12 +703,16 @@ def _schedule_with_rails(
     base_url = os.getenv("RAILS_API_URL", "http://rails-control-plane:3001").rstrip("/")
     url = f"{base_url}/webhook/pods"
     duration_s = max(3600, int(analysis.estimated_hours * 3600))
+    gpu_count = _effective_gpu_count(analysis.gpu_count)
 
     annotations: dict[str, str] = {
         "energy.io/duration-s": str(duration_s),
-        "energy.io/min-gpu-memory-mib": str(analysis.gpu_mem_gib * 1024),
         "energy.io/allowed-geos": ",".join(allowed_geos),
     }
+    if gpu_count > 0:
+        annotations["energy.io/min-gpu-memory-mib"] = str(
+            max(1024, analysis.gpu_mem_gib * 1024)
+        )
     if max_price_usd_hour is not None and max_price_usd_hour > 0:
         annotations["energy.io/max-price-usd-hour"] = str(max_price_usd_hour)
 
@@ -718,7 +734,7 @@ def _schedule_with_rails(
                             "name": "trainer",
                             "resources": {
                                 "limits": {
-                                    "nvidia.com/gpu": analysis.gpu_count,
+                                    "nvidia.com/gpu": gpu_count,
                                 }
                             },
                         }
@@ -765,6 +781,7 @@ def _dispatch_job_to_openshift(
 ) -> dict[str, Any]:
     name = _job_name(job_id)
     auth_required = _env_flag("OPENSHIFT_AUTH_REQUIRED", default=False)
+    gpu_count = _effective_gpu_count(analysis.gpu_count)
 
     try:
         from kubernetes import client as k8s_client
@@ -823,16 +840,24 @@ def _dispatch_job_to_openshift(
     duration_s = max(3600, int(analysis.estimated_hours * 3600))
     annotations: dict[str, str] = {
         "energy.io/duration-s": str(duration_s),
-        "energy.io/min-gpu-memory-mib": str(max(1024, analysis.gpu_mem_gib * 1024)),
         "energy.io/allowed-geos": ",".join(allowed_geos or ["FR", "DE", "ES"]),
         "energy.io/decision-source": scheduling_mode,
     }
+    if gpu_count > 0:
+        annotations["energy.io/min-gpu-memory-mib"] = str(
+            max(1024, analysis.gpu_mem_gib * 1024)
+        )
     if max_price_usd_hour is not None and max_price_usd_hour > 0:
         annotations["energy.io/max-price-usd-hour"] = str(max_price_usd_hour)
 
     # -- Scheduling decision fields (prepared mode bakes them in) --
     node_selector: dict[str, str] | None = None
     scheduler_name = "default-scheduler"
+    prepared_scheduler_name = (
+        os.getenv("PREPARED_SCHEDULER_NAME", "secondary-scheduler").strip()
+        or "default-scheduler"
+    )
+    apply_prepared_selector = _env_flag("PREPARED_APPLY_NODE_SELECTOR", default=True)
 
     if isinstance(decision, dict):
         # Propagate decision into annotations
@@ -852,13 +877,13 @@ def _dispatch_job_to_openshift(
 
         # In prepared mode, set nodeSelector and schedulerName directly
         if scheduling_mode == "prepared":
-            scheduler_name = "secondary-scheduler"
+            scheduler_name = prepared_scheduler_name
             selector: dict[str, str] = {}
             for sel_key in ("geo", "provider", "region", "sku"):
                 sel_val = str(decision.get(sel_key, "")).strip()
                 if sel_val:
                     selector[f"energy.io/{sel_key}"] = sel_val
-            if selector:
+            if selector and apply_prepared_selector:
                 node_selector = selector
 
     # -- Env vars --
@@ -897,11 +922,7 @@ def _dispatch_job_to_openshift(
             limits={
                 "cpu": "2",
                 "memory": "4Gi",
-                **(
-                    {"nvidia.com/gpu": analysis.gpu_count}
-                    if analysis.gpu_count > 0
-                    else {}
-                ),
+                **({"nvidia.com/gpu": gpu_count} if gpu_count > 0 else {}),
             },
         ),
     )

@@ -34,8 +34,14 @@ services:
       - SCHEDULING_MODE=${SCHEDULING_MODE:-prepared}
       - RAILS_API_URL=${RAILS_API_URL:-http://rails:3001}
       - OPENSHIFT_NAMESPACE=${OPENSHIFT_NAMESPACE:-drosel-ieu2022-dev}
+      - KUBECONFIG=/kube/config
+      - OPENSHIFT_AUTH_REQUIRED=${OPENSHIFT_AUTH_REQUIRED:-true}
+      - DISABLE_GPU_REQUESTS=${DISABLE_GPU_REQUESTS:-true}
+      - PREPARED_SCHEDULER_NAME=${PREPARED_SCHEDULER_NAME:-default-scheduler}
+      - PREPARED_APPLY_NODE_SELECTOR=${PREPARED_APPLY_NODE_SELECTOR:-false}
     volumes:
       - ./.env:/app/.env
+      - ${KUBECONFIG_PATH:-/home/velocitatem/.kube/config}:/kube/config:ro
     depends_on:
       - redis
     restart: unless-stopped

@@ -21,8 +21,8 @@ API="${1:-http://localhost:9812}"
 REPO="https://github.com/velocitatem/mnist"
 BRANCH="main"
 GEOS='["FR","DE","ES"]'
-POLL_INTERVAL=5
-MAX_POLL=120
+POLL_INTERVAL=10
+MAX_POLL=600
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -33,8 +33,14 @@ info() { printf "    \033[0;36m%s\033[0m\n" "$*"; }
 err()  { printf "\033[1;31mERROR: %s\033[0m\n" "$*" >&2; exit 1; }
 
 json_field() {
-    # Extract a top-level string field from JSON via jq
-    echo "$1" | jq -r ".$2 // empty"
+    local result
+    result=$(echo "$1" | jq -r ".$2 // empty" 2>/dev/null) || result=""
+    echo "$result"
+}
+
+safe_jq() {
+    # Run jq, return empty/fallback on parse error
+    jq "$@" 2>/dev/null || echo ""
 }
 
 poll_status() {
@@ -42,14 +48,22 @@ poll_status() {
     local target="$2"
     local elapsed=0
     local status=""
+    local resp=""
 
     while [ "$elapsed" -lt "$MAX_POLL" ]; do
-        local resp
-        resp=$(curl -sS "${API}/jobs/${job_id}")
+        resp=$(curl -sS --fail "${API}/jobs/${job_id}" 2>/dev/null) || resp=""
+
+        # Guard against non-JSON responses
+        if [ -z "$resp" ] || ! echo "$resp" | jq -e . >/dev/null 2>&1; then
+            info "(waiting for API response...  ${elapsed}s elapsed)"
+            sleep "$POLL_INTERVAL"
+            elapsed=$((elapsed + POLL_INTERVAL))
+            continue
+        fi
+
         status=$(json_field "$resp" "status")
         info "status = ${status}  (${elapsed}s elapsed)"
 
-        # Check if we reached a terminal or target state
         case "$status" in
             "$target"|dispatched|dispatch_planned|failed)
                 echo "$resp"
@@ -95,6 +109,7 @@ info "task_id:  ${TASK_ID}"
 # ---------------------------------------------------------------------------
 
 log "Step 2: Waiting for agent to finish preparation (cloning, CodeCarbon, Dockerfile)..."
+info "(this typically takes 2-4 minutes while the AI agent analyzes and modifies the repo)"
 
 PREPARED_RESP=$(poll_status "$JOB_ID" "prepared")
 PREPARED_STATUS=$(json_field "$PREPARED_RESP" "status")
@@ -111,12 +126,12 @@ info "preparation complete"
 
 log "Step 3: Inspecting prepared job"
 
-FRAMEWORK=$(echo "$PREPARED_RESP" | jq -r '.analysis.framework // "unknown"')
-ENTRYPOINT=$(echo "$PREPARED_RESP" | jq -r '.analysis.entrypoint // "unknown"')
-GPU_COUNT=$(echo "$PREPARED_RESP" | jq -r '.analysis.gpu_count // 0')
-EST_HOURS=$(echo "$PREPARED_RESP" | jq -r '.analysis.estimated_hours // "?"')
-DEPS=$(echo "$PREPARED_RESP" | jq -r '.analysis.dependencies // [] | join(", ")')
-CC_SUMMARY=$(echo "$PREPARED_RESP" | jq -r '.codecarbon_integration.codecarbon_summary // "n/a"')
+FRAMEWORK=$(echo "$PREPARED_RESP" | safe_jq -r '.analysis.framework // "unknown"')
+ENTRYPOINT=$(echo "$PREPARED_RESP" | safe_jq -r '.analysis.entrypoint // "unknown"')
+GPU_COUNT=$(echo "$PREPARED_RESP" | safe_jq -r '.analysis.gpu_count // 0')
+EST_HOURS=$(echo "$PREPARED_RESP" | safe_jq -r '.analysis.estimated_hours // "?"')
+DEPS=$(echo "$PREPARED_RESP" | safe_jq -r '.analysis.dependencies // [] | join(", ")')
+CC_SUMMARY=$(echo "$PREPARED_RESP" | safe_jq -r '.codecarbon_integration.codecarbon_summary // "n/a"')
 
 info "framework:    ${FRAMEWORK}"
 info "entrypoint:   ${ENTRYPOINT}"
@@ -132,7 +147,7 @@ info "CodeCarbon:   ${CC_SUMMARY}"
 
 log "Step 4: Changed files"
 
-CHANGED=$(echo "$PREPARED_RESP" | jq -r '.changed_files // [] | .[]')
+CHANGED=$(echo "$PREPARED_RESP" | safe_jq -r '.changed_files // [] | .[]')
 if [ -n "$CHANGED" ]; then
     echo "$CHANGED" | while read -r f; do info "  - ${f}"; done
 else
@@ -140,10 +155,10 @@ else
 fi
 
 log "Step 4b: Generated Dockerfile"
-echo "$PREPARED_RESP" | jq -r '.dockerfile_content // "n/a"' | head -25
+echo "$PREPARED_RESP" | safe_jq -r '.dockerfile_content // "n/a"' | head -25
 
 log "Step 4c: Generated patch (first 40 lines)"
-echo "$PREPARED_RESP" | jq -r '.generated_patch // "n/a"' | head -40
+echo "$PREPARED_RESP" | safe_jq -r '.generated_patch // "n/a"' | head -40
 
 # ---------------------------------------------------------------------------
 # Step 5: Retrieve prepared files from VFS
@@ -151,10 +166,10 @@ echo "$PREPARED_RESP" | jq -r '.generated_patch // "n/a"' | head -40
 
 log "Step 5: Prepared file tree"
 
-FILES_RESP=$(curl -sS "${API}/jobs/${JOB_ID}/files?stage=prepared")
+FILES_RESP=$(curl -sS --fail "${API}/jobs/${JOB_ID}/files?stage=prepared" 2>/dev/null) || FILES_RESP="{}"
 FILE_COUNT=$(json_field "$FILES_RESP" "file_count")
-info "total files in prepared VFS: ${FILE_COUNT}"
-echo "$FILES_RESP" | jq -r '.tree // [] | .[]' | head -20
+info "total files in prepared VFS: ${FILE_COUNT:-0}"
+echo "$FILES_RESP" | safe_jq -r '.tree // [] | .[]' | head -20
 
 # ---------------------------------------------------------------------------
 # Step 6: Execute (triggers Rails webhook + OpenShift dispatch)
@@ -192,27 +207,34 @@ log "Step 8: Final result"
 info "status:          ${FINAL_STATUS}"
 info "scheduling_mode: $(json_field "$FINAL_RESP" "scheduling_mode")"
 
-DECISION=$(echo "$FINAL_RESP" | jq '.scheduling_decision // {}')
+DECISION=$(echo "$FINAL_RESP" | safe_jq '.scheduling_decision // {}')
 info ""
 info "--- Scheduling Decision ---"
-echo "$DECISION" | jq -r 'to_entries[] | "    \(.key): \(.value)"'
+echo "$DECISION" | safe_jq -r 'to_entries[] | "    \(.key): \(.value)"'
 
-OPENSHIFT_JOB=$(echo "$FINAL_RESP" | jq '.openshift_job // {}')
+OPENSHIFT_JOB=$(echo "$FINAL_RESP" | safe_jq '.openshift_job // {}')
 info ""
 info "--- OpenShift Job ---"
-echo "$OPENSHIFT_JOB" | jq -r 'to_entries[] | "    \(.key): \(.value)"'
+echo "$OPENSHIFT_JOB" | safe_jq -r 'to_entries[] | "    \(.key): \(.value)"'
 
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 
+GEO=$(echo "$DECISION" | safe_jq -r '.geo // "n/a"')
+PROVIDER=$(echo "$DECISION" | safe_jq -r '.provider // "n/a"')
+REGION=$(echo "$DECISION" | safe_jq -r '.region // "n/a"')
+SCORE=$(echo "$DECISION" | safe_jq -r '.score // "n/a"')
+JOB_NAME=$(echo "$OPENSHIFT_JOB" | safe_jq -r '.job_name // "n/a"')
+NAMESPACE=$(echo "$OPENSHIFT_JOB" | safe_jq -r '.namespace // "n/a"')
+
 log "Demo complete"
 info ""
 info "Pipeline: submit -> clone -> agent (CodeCarbon) -> prepare -> confirm -> execute"
 info "  scheduling_mode = prepared"
-info "  Rails webhook returned: geo=$(echo "$DECISION" | jq -r .geo), provider=$(echo "$DECISION" | jq -r .provider), region=$(echo "$DECISION" | jq -r .region)"
-info "  Score: $(echo "$DECISION" | jq -r .score)"
-info "  Job: $(echo "$OPENSHIFT_JOB" | jq -r .job_name) in namespace $(echo "$OPENSHIFT_JOB" | jq -r .namespace)"
+info "  Rails webhook returned: geo=${GEO}, provider=${PROVIDER}, region=${REGION}"
+info "  Score: ${SCORE}"
+info "  Job: ${JOB_NAME} in namespace ${NAMESPACE}"
 info ""
 info "To switch to admission mode (requires cluster-admin):"
 info "  export SCHEDULING_MODE=admission"
