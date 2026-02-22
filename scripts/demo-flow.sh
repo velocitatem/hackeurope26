@@ -21,8 +21,8 @@ API="${1:-http://localhost:9812}"
 REPO="https://github.com/velocitatem/mnist"
 BRANCH="main"
 GEOS='["FR","DE","ES"]'
-POLL_INTERVAL=10
-MAX_POLL=600
+POLL_INTERVAL=5
+MAX_POLL="${MAX_POLL:-240}"
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -15,7 +15,7 @@ export default function Header() {
         </nav>
         <div className="flex items-center justify-end gap-3">
           <ThemeToggle />
-          <Link href="/login" className="text-sm text-neutral-600 dark:text-neutral-300 hover:text-black dark:hover:text-white transition-colors">Sign In</Link>
+          <Link href="/questions" className="text-sm text-neutral-600 dark:text-neutral-300 hover:text-black dark:hover:text-white transition-colors">Get Started</Link>
         </div>
       </div>
     </header>

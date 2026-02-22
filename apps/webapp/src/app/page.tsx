@@ -14,6 +14,15 @@ export default function Home() {
         <p className="text-lg sm:text-xl text-neutral-600 dark:text-neutral-400 text-center max-w-2xl mb-8">
           Optimize your ML training carbon footprint. Upload your repo, configure training, and find the greenest compute window.
         </p>
+
+        <div className="w-full max-w-4xl mb-10">
+          <img
+            src="/animation.svg"
+            alt="Energy-Surplus-Aware Adaptive Scheduler"
+            className="w-full h-auto rounded-xl shadow-lg"
+          />
+        </div>
+
         <div className="flex gap-4">
           <Link
             href="/questions"
