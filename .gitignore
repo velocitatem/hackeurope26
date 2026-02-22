@@ -123,7 +123,7 @@ ml/data/fin/*
 ml/data/fr/*
 ml/data/uk/*
 ml/data/weather-data/*
-*.png
+# *.png
 *.csv
 .DS_Store
 ml/data/weather-data/country_dfs
