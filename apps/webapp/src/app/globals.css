@@ -3,6 +3,20 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --tile: rgba(59, 130, 246, 0.15);
+}
+
+/* Class-based dark/light mode (user toggle) */
+html.dark {
+  --background: #0a0a0a;
+  --foreground: #e5e5e5;
+  --tile: rgba(59, 130, 246, 0.2);
+}
+
+html.light {
+  --background: #ffffff;
+  --foreground: #171717;
+  --tile: rgba(59, 130, 246, 0.15);
 }
 
 @theme inline {
@@ -13,9 +27,9 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light):not(.dark) {
     --background: #0a0a0a;
-    --foreground: #ededed;
+    --foreground: #df7979;
   }
 }
 

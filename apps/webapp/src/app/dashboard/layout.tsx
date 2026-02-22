@@ -1,14 +1,9 @@
+import "./dashboard.css";
+
 export default function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  return (
-    <div>
-      <nav>
-        <h1>Dashboard</h1>
-      </nav>
-      <main>{children}</main>
-    </div>
-  )
+  return <div className="dashboard-shell">{children}</div>;
 }

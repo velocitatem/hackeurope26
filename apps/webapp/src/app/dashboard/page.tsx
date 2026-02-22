@@ -1,21 +1,5 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/utils/supabase/server'
-import { logout } from './actions'
+import DashboardClient from "./DashboardClient";
 
-export default async function DashboardPage() {
-  const supabase = await createClient()
-
-  const { data, error } = await supabase.auth.getUser()
-  if (error || !data?.user) {
-    redirect('/login')
-  }
-
-  return (
-    <div>
-      <p>Welcome, {data.user.email}</p>
-      <form>
-        <button formAction={logout}>Logout</button>
-      </form>
-    </div>
-  )
+export default function DashboardPage() {
+  return <DashboardClient userEmail="demo@sustain.dev" />;
 }
