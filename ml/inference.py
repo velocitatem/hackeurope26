@@ -40,6 +40,8 @@ GEO_ALIASES = {
 }
 MODEL_FILE_RE = re.compile(r"gap_horizon_(\d+)h\.onnx$")
 FEATURE_FILE_RE = re.compile(r"([a-z]{2,3})_x_test_set\.parquet$")
+TARGET_FILE_RE = re.compile(r"([a-z]{2,3})_y_test_set\.parquet$")
+GAP_TARGET_RE = re.compile(r"gap_t_plus_(\d+)h$", re.IGNORECASE)
 
 
 class PredictInput(BaseModel):
@@ -226,8 +228,27 @@ class QuantifidFeatureStore:
         self.vectors: dict[str, list[list[float]]] = {}
         self.columns: dict[str, list[str]] = {}
         self.feature_count: dict[str, int] = {}
+        self.target_vectors: dict[str, list[list[float]]] = {}
+        self.target_columns: dict[str, list[str]] = {}
+        self.target_count: dict[str, int] = {}
         self.load_errors: dict[str, str] = {}
         self._load()
+
+    def _normalize_geo_token(self, token: str) -> str:
+        geo = token.upper()
+        if geo == "FI":
+            return "FIN"
+        return geo
+
+    def _prepare_numeric_df(self, df: "pd.DataFrame") -> "pd.DataFrame":
+        prepared = df.copy()
+        for col in prepared.columns:
+            series = prepared[col]
+            if getattr(series.dtype, "kind", "") == "M":
+                prepared[col] = series.astype("int64") / 1_000_000_000.0
+            else:
+                prepared[col] = pd.to_numeric(series, errors="coerce")
+        return prepared.fillna(0.0)
 
     def _load(self) -> None:
         if pd is None:
@@ -243,22 +264,13 @@ class QuantifidFeatureStore:
             match = FEATURE_FILE_RE.search(candidate.name)
             if match is None:
                 continue
-            geo = match.group(1).upper()
-            if geo == "FI":
-                geo = "FIN"
+            geo = self._normalize_geo_token(match.group(1))
             try:
                 df = pd.read_parquet(candidate)
                 if df.empty:
                     self.load_errors[geo] = f"feature set empty: {candidate.name}"
                     continue
-                prepared = df.copy()
-                for col in prepared.columns:
-                    series = prepared[col]
-                    if getattr(series.dtype, "kind", "") == "M":
-                        prepared[col] = series.astype("int64") / 1_000_000_000.0
-                    else:
-                        prepared[col] = pd.to_numeric(series, errors="coerce")
-                prepared = prepared.fillna(0.0)
+                prepared = self._prepare_numeric_df(df)
                 self.columns[geo] = [str(col) for col in prepared.columns]
                 matrix = prepared.astype("float32").values.tolist()
                 self.vectors[geo] = matrix
@@ -266,8 +278,29 @@ class QuantifidFeatureStore:
             except Exception as exc:
                 self.load_errors[geo] = f"failed to load features: {exc}"
 
+        for candidate in sorted(self.feature_dir.glob("*_y_test_set.parquet")):
+            match = TARGET_FILE_RE.search(candidate.name)
+            if match is None:
+                continue
+            geo = self._normalize_geo_token(match.group(1))
+            try:
+                df = pd.read_parquet(candidate)
+                if df.empty:
+                    self.load_errors[geo] = f"target set empty: {candidate.name}"
+                    continue
+                prepared = self._prepare_numeric_df(df)
+                self.target_columns[geo] = [str(col) for col in prepared.columns]
+                matrix = prepared.astype("float32").values.tolist()
+                self.target_vectors[geo] = matrix
+                self.target_count[geo] = int(len(matrix[0]))
+            except Exception as exc:
+                self.load_errors[geo] = f"failed to load targets: {exc}"
+
     def has_geo(self, geo: str) -> bool:
         return geo in self.vectors and len(self.vectors[geo]) > 0
+
+    def has_target_geo(self, geo: str) -> bool:
+        return geo in self.target_vectors and len(self.target_vectors[geo]) > 0
 
     def can_synthesize(
         self,
@@ -349,6 +382,92 @@ class QuantifidFeatureStore:
                 vector = vector[:expected_size]
         return vector
 
+    def _target_horizons(self, geo: str, row: list[float]) -> list[float]:
+        columns = self.target_columns.get(geo, [])
+        ordered: list[tuple[int, float]] = []
+        for idx, name in enumerate(columns):
+            match = GAP_TARGET_RE.search(name.strip())
+            if match is None:
+                continue
+            if idx >= len(row):
+                continue
+            ordered.append((int(match.group(1)), float(row[idx])))
+
+        if ordered:
+            ordered.sort(key=lambda item: item[0])
+            return [value for _, value in ordered]
+
+        return [float(value) for value in row]
+
+    def _vector_from_targets(
+        self,
+        geo: str,
+        row: list[float],
+        t: float,
+        expected_feature_names: list[str] | None,
+        expected_size: int | None,
+    ) -> list[float]:
+        horizons = self._target_horizons(geo=geo, row=row)
+        if not horizons:
+            horizons = [0.0]
+
+        base_gap = float(horizons[0])
+        mean_gap = float(sum(horizons) / len(horizons))
+        min_gap = float(min(horizons))
+        max_gap = float(max(horizons))
+        spread_gap = float(max_gap - min_gap)
+
+        if expected_feature_names:
+            vector: list[float] = []
+            for idx, feature_name in enumerate(expected_feature_names):
+                key = feature_name.lower()
+                lag_match = re.search(r"_lag_(\d+)$", key)
+
+                if key == "gap":
+                    value = base_gap
+                elif lag_match is not None:
+                    lag = int(lag_match.group(1))
+                    value = horizons[(max(1, lag) - 1) % len(horizons)]
+                elif "roll_mean" in key or "ewm" in key:
+                    value = mean_gap
+                elif "roll_min" in key:
+                    value = min_gap
+                elif "roll_max" in key:
+                    value = max_gap
+                elif "imbalance_log_ratio" in key:
+                    value = float(math.log1p(abs(base_gap)))
+                elif "gen_minus_load" in key:
+                    value = base_gap
+                elif key in {
+                    "hour",
+                    "dow",
+                    "month",
+                    "hour_sin",
+                    "hour_cos",
+                    "dow_sin",
+                    "dow_cos",
+                    "month_sin",
+                    "month_cos",
+                }:
+                    value = self._synthetic_feature_value(key, t)
+                elif "fossil_share" in key or "renewable_share" in key:
+                    value = 0.25
+                elif "ratio" in key:
+                    value = spread_gap
+                else:
+                    value = horizons[idx % len(horizons)]
+
+                vector.append(float(value))
+        else:
+            vector = [float(value) for value in horizons]
+
+        if expected_size is not None and len(vector) != expected_size:
+            if len(vector) < expected_size:
+                vector = [*vector, *([0.0] * (expected_size - len(vector)))]
+            else:
+                vector = vector[:expected_size]
+        return vector
+
     def vector_for(
         self,
         geo: str,
@@ -376,6 +495,18 @@ class QuantifidFeatureStore:
                 ]
             else:
                 vector = [float(value) for value in row]
+        elif self.has_target_geo(geo):
+            target_rows = self.target_vectors[geo]
+            seed = int(max(0.0, t)) // SECONDS_PER_HOUR
+            idx = int((seed + max(1, horizon_h)) % len(target_rows))
+            target_row = target_rows[idx]
+            vector = self._vector_from_targets(
+                geo=geo,
+                row=target_row,
+                t=t,
+                expected_feature_names=expected_feature_names,
+                expected_size=expected_size,
+            )
         else:
             if not self.can_synthesize(
                 expected_feature_names=expected_feature_names,
@@ -563,6 +694,8 @@ def _predict_tabular_series(
 def _vector_source_for_geo(geo: str) -> str:
     if _FEATURE_STORE.has_geo(geo):
         return "hardcoded_parquet"
+    if _FEATURE_STORE.has_target_geo(geo):
+        return "derived_from_y_test_parquet"
     expected = _TABULAR_MODELS.required_features(geo)
     feature_names = _TABULAR_MODELS.feature_names(geo)
     if _FEATURE_STORE.can_synthesize(
@@ -613,7 +746,9 @@ def health_check() -> dict:
     feature_alignment = {
         geo: {
             "expected_features": _TABULAR_MODELS.required_features(geo),
-            "available_hardcoded_features": _FEATURE_STORE.feature_count.get(geo),
+            "available_hardcoded_features": _FEATURE_STORE.feature_count.get(geo)
+            if _FEATURE_STORE.feature_count.get(geo) is not None
+            else _FEATURE_STORE.target_count.get(geo),
             "model_feature_names_available": _TABULAR_MODELS.feature_names(geo)
             is not None,
             "vector_source": _vector_source_for_geo(geo),
@@ -648,6 +783,8 @@ def health_check() -> dict:
             "synthetic_enabled": _FEATURE_STORE.synthetic_enabled,
             "loaded_geos": sorted(_FEATURE_STORE.vectors.keys()),
             "feature_count": _FEATURE_STORE.feature_count,
+            "loaded_y_geos": sorted(_FEATURE_STORE.target_vectors.keys()),
+            "y_feature_count": _FEATURE_STORE.target_count,
             "load_errors": _FEATURE_STORE.load_errors,
         },
         "readiness": readiness,
