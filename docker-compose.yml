@@ -37,6 +37,23 @@ services:
       - redis
     restart: unless-stopped
 
+  fastapi:
+    container_name: "${NAME}-fastapi"
+    build:
+      context: ./
+      dockerfile: ./docker/fastapi.Dockerfile
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - BACKEND_PORT=8000
+      - PYTHONPATH=/app
+    ports:
+      - "${BACKEND_PORT:-9812}:8000"
+    volumes:
+      - ./.env:/app/.env
+    depends_on:
+      - redis
+    restart: unless-stopped
+
   rails:
     container_name: "${NAME}-rails"
     build:

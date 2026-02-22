@@ -13,6 +13,8 @@ pydantic
 # Worker (Celery + Redis)
 celery[redis]
 redis
+gitpython
+kubernetes
 
 # Scraper (lib)
 seleniumbase
@@ -23,6 +25,7 @@ streamlit
 
 # AI / Agent SDK
 anthropic
+claude-agent-sdk
 
 # ML (heavy - comment out if not needed)
 torch

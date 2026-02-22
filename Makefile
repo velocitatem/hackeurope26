@@ -5,7 +5,7 @@
 .PHONY: lift lift.minio lift.tensorboard lift.logging lift.database
 .PHONY: etl train infer seed
 .PHONY: ai.plan ai.build ai.review ai.agent
-.PHONY: openshift.check openshift.login openshift.whoami openshift.bootstrap openshift.deploy openshift.demo.nyc openshift.status openshift.logs openshift.clean openshift.machinesets.render openshift.machinesets.apply
+.PHONY: openshift.check openshift.login openshift.whoami openshift.bootstrap openshift.deploy openshift.demo.nyc openshift.status openshift.logs openshift.clean openshift.machinesets.render openshift.machinesets.render.gcp openshift.machinesets.apply openshift.machinesets.apply.gcp
 .DEFAULT_GOAL := help
 
 WD         := $(shell pwd)
@@ -54,7 +54,6 @@ envlink: ## Propagate root .env and requirements.txt to all sub-apps
 	fi
 	@if [ -f "$(REQ)" ]; then \
 		cp "$(REQ)" "$(WD)/ml/requirements.txt" 2>/dev/null || true; \
-		cp "$(REQ)" "$(WD)/apps/worker/requirements.txt" 2>/dev/null || true; \
 	fi
 
 doctor: ## Verify toolchain (bun, docker, python)
@@ -168,6 +167,9 @@ openshift.clean: openshift.check ## Delete all resources in the namespace
 openshift.machinesets.render: ## Generate EU provider MachineSets + MachineAutoscalers
 	@python3 src/openshift_machinesets.py --provider-config k8s/openshift/machinesets/providers.json
 
+openshift.machinesets.render.gcp: ## Generate GCP-only MachineSets + MachineAutoscalers
+	@python3 src/openshift_machinesets.py --provider-config k8s/openshift/machinesets/providers.json --providers gcp
+
 openshift.machinesets.apply: openshift.check ## Apply generated MachineSets + MachineAutoscalers
 	@oc auth can-i create machinesets.machine.openshift.io -n openshift-machine-api >/dev/null 2>&1 || (echo "Cannot create MachineSets in openshift-machine-api"; exit 1)
 	@oc auth can-i create machineautoscalers.autoscaling.openshift.io -n openshift-machine-api >/dev/null 2>&1 || (echo "Cannot create MachineAutoscalers in openshift-machine-api"; exit 1)
@@ -175,6 +177,12 @@ openshift.machinesets.apply: openshift.check ## Apply generated MachineSets + Ma
 	@oc apply -n openshift-machine-api -f k8s/openshift/machinesets/generated/aws-machineautoscalers.yaml
 	@oc apply -n openshift-machine-api -f k8s/openshift/machinesets/generated/azure-machinesets.yaml
 	@oc apply -n openshift-machine-api -f k8s/openshift/machinesets/generated/azure-machineautoscalers.yaml
+	@oc apply -n openshift-machine-api -f k8s/openshift/machinesets/generated/gcp-machinesets.yaml
+	@oc apply -n openshift-machine-api -f k8s/openshift/machinesets/generated/gcp-machineautoscalers.yaml
+
+openshift.machinesets.apply.gcp: openshift.check ## Apply only generated GCP MachineSets + MachineAutoscalers
+	@oc auth can-i create machinesets.machine.openshift.io -n openshift-machine-api >/dev/null 2>&1 || (echo "Cannot create MachineSets in openshift-machine-api"; exit 1)
+	@oc auth can-i create machineautoscalers.autoscaling.openshift.io -n openshift-machine-api >/dev/null 2>&1 || (echo "Cannot create MachineAutoscalers in openshift-machine-api"; exit 1)
 	@oc apply -n openshift-machine-api -f k8s/openshift/machinesets/generated/gcp-machinesets.yaml
 	@oc apply -n openshift-machine-api -f k8s/openshift/machinesets/generated/gcp-machineautoscalers.yaml
 
