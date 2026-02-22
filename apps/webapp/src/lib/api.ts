@@ -1,4 +1,12 @@
-import type { SubmitRequest, ExecuteRequest, ApiResponse, JobResponse, JobListResponse, JobFilesResponse } from "@/types/api";
+import type {
+  SubmitRequest,
+  ExecuteRequest,
+  ApiResponse,
+  JobResponse,
+  JobListResponse,
+  JobFilesResponse,
+  AuditResponse,
+} from "@/types/api";
 
 const API_BASE = "/api";
 
@@ -47,5 +55,19 @@ export const api = {
   getJobFiles: (jobId: string, stage?: string) => {
     const params = stage ? `?stage=${encodeURIComponent(stage)}` : "";
     return request<JobFilesResponse>(`${API_BASE}/jobs/${jobId}/files${params}`);
+  },
+
+  listAudit: (jobExternalId?: string) => {
+    const params = jobExternalId
+      ? `?job_external_id=${encodeURIComponent(jobExternalId)}`
+      : "";
+    return request<AuditResponse>(`${API_BASE}/audit${params}`);
+  },
+
+  getJobAudit: (jobId: string, jobExternalId?: string) => {
+    const params = jobExternalId
+      ? `?job_external_id=${encodeURIComponent(jobExternalId)}`
+      : "";
+    return request<AuditResponse>(`${API_BASE}/audit/${jobId}${params}`);
   },
 };

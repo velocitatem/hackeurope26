@@ -30,6 +30,282 @@ interface JobFiles {
   [key: string]: unknown;
 }
 
+interface AuditDecision {
+  id: number;
+  job_external_id: string;
+  geo: string;
+  provider: string;
+  region: string;
+  sku: string;
+  score?: number | string | null;
+  avg_delta?: number | string | null;
+  reason_json?: Record<string, unknown>;
+  created_at: string;
+}
+
+interface AuditMigrationEvent {
+  id: number;
+  job_external_id: string;
+  status: string;
+  message?: string | null;
+  trigger_epoch?: number | null;
+  from_region?: string | null;
+  to_region?: string | null;
+  reason_json?: Record<string, unknown>;
+  created_at: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isPrimitive(value: unknown): value is string | number | boolean | null {
+  return value === null || ["string", "number", "boolean"].includes(typeof value);
+}
+
+function toDisplayLabel(value: string): string {
+  const normalized = value
+    .replace(/_/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .trim();
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function formatPrimitive(value: string | number | boolean | null): string {
+  if (value === null) return "Not set";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return Number.isFinite(value) ? value.toLocaleString() : String(value);
+  return value.length > 0 ? value : "Not set";
+}
+
+function toNumber(value: number | string | null | undefined): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function scoreToColor(score: number | null): string {
+  if (score === null) return "rgba(148, 163, 184, 0.4)";
+  const clamped = Math.max(0, Math.min(1, score));
+  const hue = 230 - clamped * 180;
+  return `hsla(${hue}, 85%, 52%, 0.65)`;
+}
+
+function ParallelAuditGraph({ decisions }: { decisions: AuditDecision[] }) {
+  if (decisions.length === 0) {
+    return (
+      <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        No scheduling decisions yet.
+      </p>
+    );
+  }
+
+  const geos = Array.from(new Set(decisions.map((d) => d.geo).filter(Boolean))).sort();
+  const providers = Array.from(new Set(decisions.map((d) => d.provider).filter(Boolean))).sort();
+  const regions = Array.from(new Set(decisions.map((d) => d.region).filter(Boolean))).sort();
+  const skus = Array.from(new Set(decisions.map((d) => d.sku).filter(Boolean))).sort();
+
+  const avgDeltas = decisions
+    .map((d) => toNumber(d.avg_delta))
+    .filter((v): v is number => v !== null);
+  const scores = decisions
+    .map((d) => toNumber(d.score))
+    .filter((v): v is number => v !== null);
+
+  const minDelta = avgDeltas.length ? Math.min(...avgDeltas) : 0;
+  const maxDelta = avgDeltas.length ? Math.max(...avgDeltas) : 1;
+  const minScore = scores.length ? Math.min(...scores) : 0;
+  const maxScore = scores.length ? Math.max(...scores) : 1;
+
+  const width = 920;
+  const height = 320;
+  const top = 22;
+  const bottom = 290;
+  const left = 28;
+  const right = 30;
+
+  const axes = ["geo", "provider", "region", "sku", "avg_delta", "score"] as const;
+  const xFor = (index: number) =>
+    left + (index * (width - left - right)) / (axes.length - 1);
+
+  const normalize = (value: number, min: number, max: number) => {
+    if (max - min < 1e-9) return 0.5;
+    return (value - min) / (max - min);
+  };
+
+  const yFromNormalized = (n: number) => bottom - n * (bottom - top);
+
+  const categoryToY = (value: string, list: string[]) => {
+    if (!list.length) return yFromNormalized(0.5);
+    const idx = Math.max(0, list.indexOf(value));
+    const n = list.length === 1 ? 0.5 : idx / (list.length - 1);
+    return yFromNormalized(n);
+  };
+
+  const numberToY = (value: number | null, min: number, max: number) => {
+    if (value === null) return yFromNormalized(0.5);
+    return yFromNormalized(normalize(value, min, max));
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="overflow-x-auto rounded-xl border border-neutral-200/60 dark:border-neutral-800 bg-white/70 dark:bg-neutral-900/60">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-[920px] min-w-full h-[320px]">
+          <defs>
+            <linearGradient id="audit-score-gradient" x1="0" x2="0" y1="1" y2="0">
+              <stop offset="0%" stopColor="#1d4ed8" />
+              <stop offset="50%" stopColor="#db2777" />
+              <stop offset="100%" stopColor="#facc15" />
+            </linearGradient>
+          </defs>
+
+          {axes.map((axis, i) => {
+            const x = xFor(i);
+            const label = axis === "avg_delta" ? "avg delta" : axis;
+            return (
+              <g key={axis}>
+                <line x1={x} y1={top} x2={x} y2={bottom} stroke="rgba(148,163,184,0.5)" strokeWidth="1" />
+                <text
+                  x={x}
+                  y={14}
+                  textAnchor="middle"
+                  style={{ fontSize: "11px", fill: "rgb(82,82,91)", fontWeight: 600 }}
+                >
+                  {label}
+                </text>
+              </g>
+            );
+          })}
+
+          {decisions.map((decision) => {
+            const score = toNumber(decision.score);
+            const avgDelta = toNumber(decision.avg_delta);
+            const points = [
+              `${xFor(0)},${categoryToY(decision.geo, geos)}`,
+              `${xFor(1)},${categoryToY(decision.provider, providers)}`,
+              `${xFor(2)},${categoryToY(decision.region, regions)}`,
+              `${xFor(3)},${categoryToY(decision.sku, skus)}`,
+              `${xFor(4)},${numberToY(avgDelta, minDelta, maxDelta)}`,
+              `${xFor(5)},${numberToY(score, minScore, maxScore)}`,
+            ].join(" ");
+
+            return (
+              <polyline
+                key={decision.id}
+                fill="none"
+                points={points}
+                stroke={scoreToColor(score)}
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            );
+          })}
+
+          <g>
+            <rect x={width - 16} y={top} width="6" height={bottom - top} fill="url(#audit-score-gradient)" rx="2" />
+            <text x={width - 20} y={top + 4} textAnchor="end" style={{ fontSize: "10px", fill: "rgb(82,82,91)" }}>
+              high
+            </text>
+            <text x={width - 20} y={bottom} textAnchor="end" style={{ fontSize: "10px", fill: "rgb(82,82,91)" }}>
+              low
+            </text>
+          </g>
+        </svg>
+      </div>
+
+      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+        Parallel coordinates of scheduling decisions. Color intensity reflects score.
+      </p>
+    </div>
+  );
+}
+
+function MigrationProgress({ events }: { events: AuditMigrationEvent[] }) {
+  if (events.length === 0) {
+    return (
+      <p className="text-sm text-neutral-500 dark:text-neutral-400">
+        No migration events yet.
+      </p>
+    );
+  }
+
+  const ordered = [...events].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+  const completeCount = ordered.filter((event) =>
+    ["completed", "success", "done", "applied"].includes((event.status ?? "").toLowerCase())
+  ).length;
+  const progress = Math.round((completeCount / ordered.length) * 100);
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">Migration Progress</p>
+          <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">{progress}%</p>
+        </div>
+        <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-cyan-500 via-blue-500 to-emerald-500"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {ordered.map((event, index) => {
+          const status = (event.status ?? "unknown").toLowerCase();
+          const isComplete = ["completed", "success", "done", "applied"].includes(status);
+          const isFailed = ["failed", "error"].includes(status);
+          const tone = isFailed
+            ? "bg-red-500"
+            : isComplete
+              ? "bg-emerald-500"
+              : "bg-amber-500";
+
+          return (
+            <div
+              key={event.id}
+              className="grid grid-cols-[20px_1fr] gap-3 rounded-lg border border-neutral-200/60 bg-neutral-50/60 p-3 dark:border-neutral-800 dark:bg-neutral-900/50"
+            >
+              <div className="relative flex justify-center">
+                <span className={`mt-1 h-2.5 w-2.5 rounded-full ${tone}`} />
+                {index < ordered.length - 1 && (
+                  <span className="absolute top-5 h-8 w-px bg-neutral-300 dark:bg-neutral-700" />
+                )}
+              </div>
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="rounded-full bg-neutral-200 px-2 py-0.5 font-semibold uppercase tracking-wider text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+                    {status}
+                  </span>
+                  <span className="text-neutral-500 dark:text-neutral-400">
+                    {new Date(event.created_at).toLocaleString()}
+                  </span>
+                  {typeof event.trigger_epoch === "number" && (
+                    <span className="text-neutral-500 dark:text-neutral-400">epoch {event.trigger_epoch}</span>
+                  )}
+                </div>
+                <p className="text-sm text-neutral-700 dark:text-neutral-300">
+                  {event.message ?? "No migration message."}
+                </p>
+                {(event.from_region || event.to_region) && (
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    {event.from_region ?? "unknown"} {"->"} {event.to_region ?? "unknown"}
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Status Badge ───────────────────────────────────────────────
 function StatusBadge({ status }: { status?: string }) {
   const s = (status ?? "unknown").toLowerCase();
@@ -123,6 +399,100 @@ function StatCard({
   );
 }
 
+function StructuredDataCard({ label, value }: { label: string; value: unknown }) {
+  if (isRecord(value)) {
+    const entries = Object.entries(value);
+    return (
+      <div className="rounded-lg border border-neutral-200/70 bg-white/70 p-3 dark:border-neutral-800 dark:bg-neutral-950/40">
+        <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+          {label}
+        </p>
+        {entries.length === 0 ? (
+          <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">No fields</p>
+        ) : (
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {entries.map(([nestedKey, nestedValue]) => (
+              <StructuredDataCard
+                key={`${label}-${nestedKey}`}
+                label={toDisplayLabel(nestedKey)}
+                value={nestedValue}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (Array.isArray(value)) {
+    const primitiveItems = value.filter(isPrimitive);
+    const hasOnlyPrimitiveItems = primitiveItems.length === value.length;
+
+    return (
+      <div className="rounded-lg border border-neutral-200/70 bg-white/70 p-3 dark:border-neutral-800 dark:bg-neutral-950/40">
+        <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+          {label}
+        </p>
+        {value.length === 0 ? (
+          <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">None</p>
+        ) : hasOnlyPrimitiveItems ? (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {primitiveItems.map((item, index) => (
+              <span
+                key={`${label}-${index}`}
+                className="rounded-md bg-neutral-200/70 px-2 py-0.5 text-xs font-medium text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+              >
+                {formatPrimitive(item)}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-2 space-y-2">
+            {value.map((item, index) => (
+              <StructuredDataCard
+                key={`${label}-${index}`}
+                label={`Item ${index + 1}`}
+                value={item}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-neutral-200/70 bg-white/70 p-3 dark:border-neutral-800 dark:bg-neutral-950/40">
+      <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-medium text-neutral-800 dark:text-neutral-200 break-words">
+        {formatPrimitive(isPrimitive(value) ? value : null)}
+      </p>
+    </div>
+  );
+}
+
+function StructuredDataView({
+  data,
+  emptyText,
+}: {
+  data?: Record<string, unknown>;
+  emptyText: string;
+}) {
+  if (!data || Object.keys(data).length === 0) {
+    return <p className="text-sm text-neutral-500 dark:text-neutral-400">{emptyText}</p>;
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {Object.entries(data).map(([key, value]) => (
+        <StructuredDataCard key={key} label={toDisplayLabel(key)} value={value} />
+      ))}
+    </div>
+  );
+}
+
 // ─── File Tree ──────────────────────────────────────────────────
 function FileTree({ tree, depth = 0 }: { tree: Record<string, unknown>; depth?: number }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -191,6 +561,10 @@ function JobDetailPanel({
   const [files, setFiles] = useState<JobFiles | null>(null);
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [activeFileTab, setActiveFileTab] = useState<"prepared" | "source">("prepared");
+  const [auditDecisions, setAuditDecisions] = useState<AuditDecision[]>([]);
+  const [auditMigrations, setAuditMigrations] = useState<AuditMigrationEvent[]>([]);
+  const [loadingAudit, setLoadingAudit] = useState(true);
+  const [auditError, setAuditError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -213,6 +587,47 @@ function JobDetailPanel({
     };
   }, [job.job_id]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const pollAudit = async () => {
+      try {
+        if (!cancelled) setLoadingAudit(true);
+        const res = await fetch(`/api/audit/${job.job_id}`);
+        const data = await res.json().catch(() => null);
+
+        if (!cancelled) {
+          if (res.ok && data) {
+            setAuditDecisions(
+              Array.isArray(data.schedulingDecisions)
+                ? (data.schedulingDecisions as AuditDecision[])
+                : []
+            );
+            setAuditMigrations(
+              Array.isArray(data.migrationEvents)
+                ? (data.migrationEvents as AuditMigrationEvent[])
+                : []
+            );
+            setAuditError(null);
+          } else {
+            setAuditError("Could not load audit trail.");
+          }
+        }
+      } catch {
+        if (!cancelled) setAuditError("Could not load audit trail.");
+      } finally {
+        if (!cancelled) setLoadingAudit(false);
+      }
+    };
+
+    pollAudit();
+    const interval = setInterval(pollAudit, 10000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [job.job_id]);
+
   const loadFiles = async (stage: "prepared" | "source") => {
     setLoadingFiles(true);
     setActiveFileTab(stage);
@@ -229,6 +644,7 @@ function JobDetailPanel({
   const d = detail ?? job;
   const spec = d.estimated_job_spec as Record<string, unknown> | undefined;
   const canExecute = d.phase === "ready" || d.status === "ready" || d.phase === "prepared";
+  const latestDecision = auditDecisions[0] ?? null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-end">
@@ -308,13 +724,60 @@ function JobDetailPanel({
               <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
                 Estimated Job Spec
               </h3>
-              <div className="rounded-xl border border-neutral-200/60 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/50 p-4 overflow-x-auto">
-                <pre className="text-xs font-mono text-neutral-600 dark:text-neutral-400 whitespace-pre-wrap">
-                  {JSON.stringify(spec, null, 2)}
-                </pre>
+              <div className="rounded-xl border border-neutral-200/60 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/50 p-4">
+                <StructuredDataView data={spec} emptyText="No estimated spec available." />
               </div>
             </div>
           )}
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+                Audit Trail
+              </h3>
+              <div className="flex gap-2 text-xs text-neutral-500">
+                <span>{auditDecisions.length} decisions</span>
+                <span>&middot;</span>
+                <span>{auditMigrations.length} migrations</span>
+              </div>
+            </div>
+
+            {loadingAudit ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
+              </div>
+            ) : auditError ? (
+              <p className="text-sm text-red-500">{auditError}</p>
+            ) : (
+              <>
+                <div className="rounded-xl border border-neutral-200/60 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/50 p-4">
+                  <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                    Decision Graph
+                  </h4>
+                  <ParallelAuditGraph decisions={auditDecisions} />
+                </div>
+
+                {latestDecision && (
+                  <div className="rounded-xl border border-neutral-200/60 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/50 p-4">
+                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                      Latest Decision Reason
+                    </h4>
+                    <StructuredDataView
+                      data={latestDecision.reason_json}
+                      emptyText="No decision reason details available."
+                    />
+                  </div>
+                )}
+
+                <div className="rounded-xl border border-neutral-200/60 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/50 p-4">
+                  <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                    Migration Timeline
+                  </h4>
+                  <MigrationProgress events={auditMigrations} />
+                </div>
+              </>
+            )}
+          </div>
 
           {/* File Tree */}
           {files && (

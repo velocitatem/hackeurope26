@@ -24,6 +24,11 @@ Open [http://localhost:3000](http://localhost:3000).
 Auth is wired to Supabase via `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 Set `NEXT_PUBLIC_REQUIRE_AUTH=false` in `.env` to disable auth-gating entirely (default for quick prototyping).
 
+## Backend connections
+
+- `BACKEND_URL` (default `http://localhost:9812`) for job lifecycle endpoints.
+- `RAILS_API_URL` (default `http://localhost:3001`) for audit endpoints proxied at `/api/audit`.
+
 ## Structure
 
 ```
