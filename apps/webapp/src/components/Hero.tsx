@@ -1,22 +1,17 @@
-import Link from "next/link";
 import { getLocale } from "@/libs/locales";
+import HeroFlow from "@/components/HeroFlow";
 
 export default function Hero() {
   const { common } = getLocale('en');
   
   return (
-    <section>
-      {/* TODO: Style this hero section when implementing in your project */}
-      <div>
-        <h1>{common.hero.title}</h1>
-        <p>{common.hero.description}</p>
-        <div>
-          <Link href="/dashboard">
-            <button>{common.hero.actions.getStarted}</button>
-          </Link>
-          <Link href="/blog">
-            <button>{common.hero.actions.learnMore}</button>
-          </Link>
+    <section className="flex min-h-[60vh] items-center justify-center px-4 py-20">
+      <div className="flex max-w-2xl flex-col items-center gap-6 text-center">
+        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+          {common.hero.title}
+        </h1>
+        <div className="mt-4 w-full">
+          <HeroFlow />
         </div>
       </div>
     </section>
