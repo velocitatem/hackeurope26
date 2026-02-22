@@ -24,9 +24,9 @@ export default function RootLayout({
                     }}
                 />
             </head>
-            <body className={`${fontVariables} antialiased`}>
+            <body className={`${fontVariables} antialiased min-h-screen flex flex-col`}>
                 <Header />
-                <main className="min-h-screen">
+                <main className="flex-1">
                     {children}
                 </main>
                 <Footer />

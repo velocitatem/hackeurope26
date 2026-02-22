@@ -1,8 +1,3 @@
-import { createClient } from '@/utils/supabase/server';
-
 export default async function Instruments() {
-  const supabase = await createClient();
-  const { data: instruments } = await supabase.from("instruments").select();
-
-  return <pre>{JSON.stringify(instruments, null, 2)}</pre>
+  return <p className="px-6 py-10 text-sm text-neutral-600 dark:text-neutral-400">No instrument datasource configured.</p>
 }
