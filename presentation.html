@@ -14,7 +14,7 @@
       --accent-green: #00FF66;
       --accent-glow: rgba(0, 255, 102, 0.25);
     }
-    
+        
     body {
       background-color: var(--bg-dark);
       color: #F8FAFC;
@@ -181,292 +181,334 @@
   </div>
 
 
-  <!-- Slide 2b: Live Scheduler Animation -->
+  <!-- Slide 2b: Data & Pipeline -->
   <div class="slide" id="slide-2b">
-    <div class="content-wrapper max-w-5xl">
-      <h2 class="text-[#00FF66] font-display text-sm tracking-[0.2em] uppercase mb-2">How It Works — Live</h2>
-      <h3 class="text-3xl font-bold mb-6 text-white">Adaptive Energy-Surplus Routing</h3>
-      <div class="glass-panel rounded-2xl overflow-hidden" style="height: 520px; border: 1px solid rgba(0,255,102,0.2);">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 550" width="100%" height="100%" style="font-family: system-ui, -apple-system, sans-serif; background-color: transparent;">
-  
-  <defs>
-    <!-- Shadows -->
-    <filter id="shadow-sm" x="-10%" y="-10%" width="120%" height="120%">
-      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.05" />
-    </filter>
-    <filter id="shadow-md" x="-10%" y="-10%" width="120%" height="120%">
-      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.1" />
-    </filter>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="4" result="blur" />
-      <feComposite in="SourceGraphic" in2="blur" operator="over" />
-    </filter>
+    <div class="content-wrapper max-w-6xl w-full">
+      <h2 class="text-[#00FF66] font-display text-sm tracking-[0.2em] uppercase mb-1">How We Built the Forecasts</h2>
+      <h3 class="text-3xl font-bold mb-4 text-white">Data Pipeline & Modelling</h3>
 
-    <!-- Gradients for Energy Charts -->
-    <linearGradient id="energyGrad" x1="0" y1="0" x2="0" y2="120" gradientUnits="userSpaceOnUse">
-      <stop offset="49%" stop-color="#10b981" />
-      <stop offset="51%" stop-color="#f59e0b" />
-    </linearGradient>
-    
-    <linearGradient id="energyGradFill" x1="0" y1="0" x2="0" y2="120" gradientUnits="userSpaceOnUse">
-      <stop offset="49%" stop-color="#10b981" stop-opacity="0.2" />
-      <stop offset="51%" stop-color="#f59e0b" stop-opacity="0.2" />
-    </linearGradient>
+      <div class="rounded-2xl overflow-hidden" style="border: 1px solid rgba(0,255,102,0.2); background: #080c0f;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 480" class="w-full h-auto" style="max-height: 54vh;">
+          <defs>
+            <!-- Arrowheads -->
+            <marker id="dp-arr-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#00ff88"/>
+            </marker>
+            <marker id="dp-arr-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#4a9eff"/>
+            </marker>
+            <marker id="dp-arr-cyan" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#00e5ff"/>
+            </marker>
 
-    <!-- ML Job Gradient -->
-    <linearGradient id="jobGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#6366f1" />
-      <stop offset="100%" stop-color="#4f46e5" />
-    </linearGradient>
+            <!-- Glow filter -->
+            <filter id="dp-glow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="3" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+            <filter id="dp-glow-sm" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="1.5" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
 
-    <!-- Clip Paths for Charts -->
-    <clipPath id="chart-clip">
-      <rect x="0" y="0" width="200" height="120" rx="4" />
-    </clipPath>
+            <!-- Grid pattern -->
+            <pattern id="dp-grid" width="30" height="30" patternUnits="userSpaceOnUse">
+              <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#0f1820" stroke-width="0.5"/>
+            </pattern>
+          </defs>
 
-    <!-- Reusable Chart Grid -->
-    <g id="chart-grid">
-      <!-- Forecast Area Background -->
-      <rect x="50" y="0" width="150" height="120" fill="#0f2018" opacity="0.5" />
-      <!-- Zero Line -->
-      <line x1="0" y1="60" x2="200" y2="60" stroke="#1e3a2f" stroke-width="1.5" stroke-dasharray="4 4" />
-      <!-- NOW Line -->
-      <line x1="50" y1="0" x2="50" y2="120" stroke="#00FF66" stroke-width="2" stroke-dasharray="3 3" />
-      <text x="50" y="15" fill="#00FF66" font-size="10" font-weight="bold" text-anchor="middle" letter-spacing="1">NOW</text>
-      <!-- Axis Labels -->
-      <text x="10" y="25" fill="#10b981" font-size="12" font-weight="bold">+</text>
-      <text x="10" y="105" fill="#f59e0b" font-size="14" font-weight="bold">-</text>
-    </g>
+          <!-- Background -->
+          <rect width="1100" height="480" fill="#080c0f" rx="6"/>
+          <rect width="1100" height="480" fill="url(#dp-grid)" rx="6"/>
 
-    <!-- Data Center Rack Icon -->
-    <g id="rack-icon">
-      <rect x="0" y="0" width="40" height="50" rx="3" fill="#1a2e22" stroke="#2d5a40" stroke-width="1.5" />
-      <rect x="5" y="5" width="30" height="10" rx="1.5" fill="#0c1f16" stroke="#2d5a40" />
-      <circle cx="12" cy="10" r="2" fill="#10b981">
-        <animate attributeName="opacity" values="1;0.2;1" dur="1.5s" repeatCount="indefinite" />
-      </circle>
-      <rect x="5" y="20" width="30" height="10" rx="1.5" fill="#0c1f16" stroke="#2d5a40" />
-      <circle cx="12" cy="25" r="2" fill="#10b981">
-        <animate attributeName="opacity" values="1;0.2;1" dur="2s" repeatCount="indefinite" />
-      </circle>
-      <rect x="5" y="35" width="30" height="10" rx="1.5" fill="#0c1f16" stroke="#2d5a40" />
-      <circle cx="12" cy="40" r="2" fill="#10b981">
-        <animate attributeName="opacity" values="1;0.2;1" dur="1s" repeatCount="indefinite" />
-      </circle>
-    </g>
-  </defs>
+          <!-- ============================================================ -->
+          <!-- LEFT LAYER LABELS -->
+          <!-- ============================================================ -->
+          <rect x="0" y="20" width="3" height="90" fill="#4a9eff" rx="1"/>
+          <text x="8" y="42" font-family="IBM Plex Mono" font-size="8" fill="#2d4a60" letter-spacing="2">DATA</text>
+          <text x="8" y="55" font-family="IBM Plex Mono" font-size="8" fill="#2d4a60" letter-spacing="2">SOURCES</text>
 
-  <!-- ================= BACKGROUND & HEADER ================= -->
-  <rect width="100%" height="100%" fill="transparent" />
-  
-  <text x="400" y="35" fill="#00FF66" font-size="20" font-weight="800" text-anchor="middle" letter-spacing="-0.5">Energy-Surplus–Aware Adaptive Scheduler</text>
-  <text x="400" y="55" fill="#6b9e7e" font-size="13" font-weight="500" text-anchor="middle">Dynamic ML placement &amp; seamless migration based on delta(t) = production(t) − demand(t)</text>
+          <rect x="0" y="155" width="3" height="70" fill="#00ff88" rx="1"/>
+          <text x="8" y="175" font-family="IBM Plex Mono" font-size="8" fill="#2d4a60" letter-spacing="2">INGEST</text>
+          <text x="8" y="188" font-family="IBM Plex Mono" font-size="8" fill="#2d4a60" letter-spacing="2">& BUILD</text>
 
-  <!-- ================= CHARTS SECTION (TOP) ================= -->
-  
-  <!-- Chart 1: France (FR) -->
-  <g transform="translate(50, 80)">
-    <rect width="200" height="120" rx="6" fill="#0c1f16" stroke="#1e3a2f" stroke-width="1.5" filter="url(#shadow-sm)" />
-    <text x="100" y="-8" fill="#94d4a8" font-size="12" font-weight="bold" text-anchor="middle">eu-west (FR) Delta Forecast</text>
-    
-    <g clip-path="url(#chart-clip)">
-      <use href="#chart-grid" />
-      <g>
-        <animateTransform attributeName="transform" type="translate" values="0,0; -300,0" dur="10s" repeatCount="indefinite" />
-        <!-- FR Area Path (Surplus drops to Deficit at x=150) -->
-        <path d="M 0,60 L 0,20 L 100,20 C 130,20 150,100 180,100 L 270,100 C 285,100 295,20 300,20 L 400,20 C 430,20 450,100 480,100 L 570,100 C 585,100 595,20 600,20 L 600,60 Z" fill="url(#energyGradFill)" />
-        <!-- FR Line Path -->
-        <path d="M 0,20 L 100,20 C 130,20 150,100 180,100 L 270,100 C 285,100 295,20 300,20 L 400,20 C 430,20 450,100 480,100 L 570,100 C 585,100 595,20 600,20" fill="none" stroke="url(#energyGrad)" stroke-width="3" />
-      </g>
-    </g>
-  </g>
+          <rect x="0" y="270" width="3" height="90" fill="#00ff88" rx="1"/>
+          <text x="8" y="292" font-family="IBM Plex Mono" font-size="8" fill="#2d4a60" letter-spacing="2">ML</text>
+          <text x="8" y="305" font-family="IBM Plex Mono" font-size="8" fill="#2d4a60" letter-spacing="2">MODELS</text>
 
-  <!-- Chart 2: Germany (DE) -->
-  <g transform="translate(300, 80)">
-    <rect width="200" height="120" rx="6" fill="#0c1f16" stroke="#1e3a2f" stroke-width="1.5" filter="url(#shadow-sm)" />
-    <text x="100" y="-8" fill="#94d4a8" font-size="12" font-weight="bold" text-anchor="middle">eu-central (DE) Delta Forecast</text>
-    
-    <g clip-path="url(#chart-clip)">
-      <use href="#chart-grid" />
-      <g>
-        <animateTransform attributeName="transform" type="translate" values="0,0; -300,0" dur="10s" repeatCount="indefinite" />
-        <!-- DE Area Path (Deficit rises to Surplus at x=150) -->
-        <path d="M 0,60 L 0,100 L 100,100 C 130,100 150,20 180,20 L 270,20 C 285,20 295,100 300,100 L 400,100 C 430,100 450,20 480,20 L 570,20 C 585,20 595,100 600,100 L 600,60 Z" fill="url(#energyGradFill)" />
-        <!-- DE Line Path -->
-        <path d="M 0,100 L 100,100 C 130,100 150,20 180,20 L 270,20 C 285,20 295,100 300,100 L 400,100 C 430,100 450,20 480,20 L 570,20 C 585,20 595,100 600,100" fill="none" stroke="url(#energyGrad)" stroke-width="3" />
-      </g>
-    </g>
-  </g>
+          <rect x="0" y="400" width="3" height="65" fill="#00e5ff" rx="1"/>
+          <text x="8" y="420" font-family="IBM Plex Mono" font-size="8" fill="#2d4a60" letter-spacing="2">OUTPUT</text>
 
-  <!-- Chart 3: Spain (ES) -->
-  <g transform="translate(550, 80)">
-    <rect width="200" height="120" rx="6" fill="#0c1f16" stroke="#1e3a2f" stroke-width="1.5" filter="url(#shadow-sm)" />
-    <text x="100" y="-8" fill="#94d4a8" font-size="12" font-weight="bold" text-anchor="middle">eu-south (ES) Delta Forecast</text>
-    
-    <g clip-path="url(#chart-clip)">
-      <use href="#chart-grid" />
-      <g>
-        <animateTransform attributeName="transform" type="translate" values="0,0; -300,0" dur="10s" repeatCount="indefinite" />
-        <!-- ES Area Path (Stays relatively flat/low) -->
-        <path d="M 0,60 L 0,80 Q 75,100 150,80 Q 225,60 300,80 Q 375,100 450,80 Q 525,60 600,80 L 600,60 Z" fill="url(#energyGradFill)" />
-        <path d="M 0,80 Q 75,100 150,80 Q 225,60 300,80 Q 375,100 450,80 Q 525,60 600,80" fill="none" stroke="url(#energyGrad)" stroke-width="3" />
-      </g>
-    </g>
-  </g>
+          <!-- ============================================================ -->
+          <!-- ROW 1: DATA SOURCES (y=20 to y=140) -->
+          <!-- ============================================================ -->
 
+          <!-- Energy API Group label -->
+          <rect x="48" y="12" width="548" height="128" rx="4" fill="rgba(0,255,136,0.03)" stroke="rgba(0,255,136,0.15)" stroke-width="1" stroke-dasharray="4 3"/>
+          <text x="62" y="8" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" letter-spacing="2">ENERGY APIS — NATIONAL GRID OPERATORS</text>
 
-  <!-- ================= INFRASTRUCTURE / DATA CENTERS (BOTTOM) ================= -->
-  
-  <!-- Global Network Line Connecting DCs -->
-  <line x1="150" y1="360" x2="650" y2="360" stroke="#1e3a2f" stroke-width="3" stroke-dasharray="6 6" />
-  
-  <!-- Migration Activity Path (Hidden by default, shows during migration) -->
-  <g>
-    <animate attributeName="opacity" values="0; 0; 1; 0; 0" keyTimes="0; 0.35; 0.4; 0.45; 1" dur="10s" repeatCount="indefinite" />
-    <line x1="150" y1="360" x2="400" y2="360" stroke="#6366f1" stroke-width="4" stroke-dasharray="8 8">
-      <animate attributeName="stroke-dashoffset" from="16" to="0" dur="0.4s" repeatCount="indefinite" />
-    </line>
-    <!-- Little data packets -->
-    <circle cx="200" cy="360" r="4" fill="#6366f1" filter="url(#glow)">
-      <animate attributeName="cx" values="150;400" dur="1s" repeatCount="indefinite" />
-    </circle>
-  </g>
+          <!-- FR source -->
+          <g transform="translate(58, 24)">
+            <rect width="110" height="100" rx="3" fill="#0c1419" stroke="#00ff88" stroke-width="1"/>
+            <rect x="0" y="-1" width="70" height="13" rx="2" fill="rgba(0,255,136,0.1)" stroke="rgba(0,255,136,0.25)" stroke-width="0.5"/>
+            <text x="6" y="9" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" letter-spacing="1">FRANCE</text>
+            <text x="12" y="38" font-size="20">🇫🇷</text>
+            <text x="10" y="62" font-family="IBM Plex Mono" font-size="8" fill="#94d4a8" font-weight="600">services-rte</text>
+            <text x="10" y="76" font-family="IBM Plex Mono" font-size="7" fill="#4a6070">Generation mix</text>
+            <text x="10" y="88" font-family="IBM Plex Mono" font-size="7" fill="#4a6070">Load · Demand</text>
+          </g>
 
-  <!-- FR Data Center -->
-  <g transform="translate(60, 310)">
-    <rect width="180" height="100" rx="8" fill="#0c1f16" stroke="#1e3a2f" stroke-width="2" filter="url(#shadow-md)" />
-    <!-- Status Indicator Outline (Green when active) -->
-    <rect width="180" height="100" rx="8" fill="none" stroke="#10b981" stroke-width="3">
-      <animate attributeName="opacity" values="1; 1; 0; 0; 1" keyTimes="0; 0.35; 0.4; 0.95; 1" dur="10s" repeatCount="indefinite" />
-    </rect>
-    <text x="90" y="25" fill="#e2f0e8" font-size="14" font-weight="bold" text-anchor="middle">Region: eu-west</text>
-    <text x="90" y="42" fill="#6b9e7e" font-size="11" text-anchor="middle">Hardware: 8x A100</text>
-    <use href="#rack-icon" x="40" y="45" />
-    <use href="#rack-icon" x="100" y="45" />
-  </g>
+          <!-- UK source -->
+          <g transform="translate(188, 24)">
+            <rect width="110" height="100" rx="3" fill="#0c1419" stroke="#00ff88" stroke-width="1"/>
+            <rect x="0" y="-1" width="50" height="13" rx="2" fill="rgba(0,255,136,0.1)" stroke="rgba(0,255,136,0.25)" stroke-width="0.5"/>
+            <text x="6" y="9" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" letter-spacing="1">UK</text>
+            <text x="12" y="38" font-size="20">🇬🇧</text>
+            <text x="10" y="62" font-family="IBM Plex Mono" font-size="8" fill="#94d4a8" font-weight="600">bmrs.elexon</text>
+            <text x="10" y="76" font-family="IBM Plex Mono" font-size="7" fill="#4a6070">Generation mix</text>
+            <text x="10" y="88" font-family="IBM Plex Mono" font-size="7" fill="#4a6070">Load · Demand</text>
+          </g>
 
-  <!-- DE Data Center -->
-  <g transform="translate(310, 310)">
-    <rect width="180" height="100" rx="8" fill="#0c1f16" stroke="#1e3a2f" stroke-width="2" filter="url(#shadow-md)" />
-    
-    <!-- Warm-start Glow Box (Orange) -->
-    <rect width="180" height="100" rx="8" fill="none" stroke="#f59e0b" stroke-width="4">
-      <animate attributeName="opacity" values="0; 0; 1; 1; 0; 0; 0" keyTimes="0; 0.25; 0.28; 0.38; 0.4; 0.95; 1" dur="10s" repeatCount="indefinite" />
-    </rect>
-    
-    <!-- Active Glow Box (Green) -->
-    <rect width="180" height="100" rx="8" fill="none" stroke="#10b981" stroke-width="3">
-      <animate attributeName="opacity" values="0; 0; 1; 1; 0" keyTimes="0; 0.38; 0.4; 0.95; 1" dur="10s" repeatCount="indefinite" />
-    </rect>
+          <!-- FI source -->
+          <g transform="translate(318, 24)">
+            <rect width="110" height="100" rx="3" fill="#0c1419" stroke="#00ff88" stroke-width="1"/>
+            <rect x="0" y="-1" width="70" height="13" rx="2" fill="rgba(0,255,136,0.1)" stroke="rgba(0,255,136,0.25)" stroke-width="0.5"/>
+            <text x="6" y="9" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" letter-spacing="1">FINLAND</text>
+            <text x="12" y="38" font-size="20">🇫🇮</text>
+            <text x="10" y="62" font-family="IBM Plex Mono" font-size="8" fill="#94d4a8" font-weight="600">Fingrid API</text>
+            <text x="10" y="76" font-family="IBM Plex Mono" font-size="7" fill="#4a6070">Generation mix</text>
+            <text x="10" y="88" font-family="IBM Plex Mono" font-size="7" fill="#4a6070">Load · Demand</text>
+          </g>
 
-    <text x="90" y="25" fill="#e2f0e8" font-size="14" font-weight="bold" text-anchor="middle">Region: eu-central</text>
-    <text x="90" y="42" fill="#6b9e7e" font-size="11" text-anchor="middle">Hardware: 8x A100</text>
-    <use href="#rack-icon" x="40" y="45" />
-    <use href="#rack-icon" x="100" y="45" />
+          <!-- IT source -->
+          <g transform="translate(448, 24)">
+            <rect width="110" height="100" rx="3" fill="#0c1419" stroke="#00ff88" stroke-width="1"/>
+            <rect x="0" y="-1" width="55" height="13" rx="2" fill="rgba(0,255,136,0.1)" stroke="rgba(0,255,136,0.25)" stroke-width="0.5"/>
+            <text x="6" y="9" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" letter-spacing="1">ITALY</text>
+            <text x="12" y="38" font-size="20">🇮🇹</text>
+            <text x="10" y="62" font-family="IBM Plex Mono" font-size="8" fill="#94d4a8" font-weight="600">dati.terna</text>
+            <text x="10" y="76" font-family="IBM Plex Mono" font-size="7" fill="#4a6070">Generation mix</text>
+            <text x="10" y="88" font-family="IBM Plex Mono" font-size="7" fill="#4a6070">Load · Demand</text>
+          </g>
 
-    <!-- Warm-start overlay label -->
-    <g>
-      <animate attributeName="opacity" values="0; 0; 1; 1; 0; 0" keyTimes="0; 0.25; 0.28; 0.38; 0.4; 1" dur="10s" repeatCount="indefinite" />
-      <rect x="25" y="-15" width="130" height="24" rx="12" fill="#f59e0b" filter="url(#glow)" />
-      <text x="90" y="1" fill="#0c1f16" font-size="10" font-weight="bold" text-anchor="middle" letter-spacing="1">WARM-STARTING</text>
-    </g>
-  </g>
+          <!-- Weather source (separate group) -->
+          <g transform="translate(640, 24)">
+            <rect width="160" height="100" rx="3" fill="#0c1419" stroke="#4a9eff" stroke-width="1"/>
+            <rect x="0" y="-1" width="100" height="13" rx="2" fill="rgba(74,158,255,0.1)" stroke="rgba(74,158,255,0.25)" stroke-width="0.5"/>
+            <text x="6" y="9" font-family="IBM Plex Mono" font-size="7" fill="#4a9eff" letter-spacing="1">WEATHER API</text>
+            <text x="12" y="38" font-size="20">🌤️</text>
+            <text x="10" y="62" font-family="IBM Plex Mono" font-size="8" fill="#7dd3fc" font-weight="600">Open-Weather</text>
+            <text x="10" y="76" font-family="IBM Plex Mono" font-size="7" fill="#4a6070">Wind speed · Irradiance</text>
+            <text x="10" y="88" font-family="IBM Plex Mono" font-size="7" fill="#4a6070">Temperature · Cloud cover</text>
+          </g>
 
-  <!-- ES Data Center -->
-  <g transform="translate(560, 310)">
-    <rect width="180" height="100" rx="8" fill="#0c1f16" stroke="#1e3a2f" stroke-width="2" filter="url(#shadow-md)" />
-    <text x="90" y="25" fill="#e2f0e8" font-size="14" font-weight="bold" text-anchor="middle">Region: eu-south</text>
-    <text x="90" y="42" fill="#6b9e7e" font-size="11" text-anchor="middle">Hardware: Offline</text>
-    <use href="#rack-icon" x="40" y="45" opacity="0.4" />
-    <use href="#rack-icon" x="100" y="45" opacity="0.4" />
-  </g>
+          <!-- Specs badge (right) -->
+          <g transform="translate(840, 24)">
+            <rect width="240" height="100" rx="3" fill="#0a0e14" stroke="rgba(100,116,139,0.3)" stroke-width="1"/>
+            <rect x="0" y="-1" width="70" height="13" rx="2" fill="rgba(100,116,139,0.1)" stroke="rgba(100,116,139,0.25)" stroke-width="0.5"/>
+            <text x="6" y="9" font-family="IBM Plex Mono" font-size="7" fill="#64748b" letter-spacing="1">DATASET SPECS</text>
+            <text x="12" y="35" font-family="IBM Plex Mono" font-size="8" fill="#94a3b8">Granularity</text>
+            <text x="120" y="35" font-family="IBM Plex Mono" font-size="8" fill="#e2e8f0" font-weight="600">Hourly</text>
+            <text x="12" y="51" font-family="IBM Plex Mono" font-size="8" fill="#94a3b8">History</text>
+            <text x="120" y="51" font-family="IBM Plex Mono" font-size="8" fill="#e2e8f0" font-weight="600">~10 years</text>
+            <text x="12" y="67" font-family="IBM Plex Mono" font-size="8" fill="#94a3b8">Features</text>
+            <text x="120" y="67" font-family="IBM Plex Mono" font-size="8" fill="#e2e8f0" font-weight="600">Energy + Weather</text>
+            <text x="12" y="83" font-family="IBM Plex Mono" font-size="8" fill="#94a3b8">Target</text>
+            <text x="120" y="83" font-family="IBM Plex Mono" font-size="8" fill="#00ff88" font-weight="600">surplus (MW)</text>
+          </g>
 
+          <!-- ============================================================ -->
+          <!-- ROW 2: FEATURIZE (y=155) -->
+          <!-- ============================================================ -->
 
-  <!-- ================= THE ML JOB PAYLOAD ================= -->
-  
-  <g>
-    <!-- Master Translation Animation -->
-    <animateTransform attributeName="transform" type="translate" values="80,240; 80,240; 330,240; 330,240; 80,240" keyTimes="0; 0.35; 0.45; 0.95; 1" dur="10s" repeatCount="indefinite" />
-    
-    <!-- Master Opacity Animation to hide the "snap back" -->
-    <animate attributeName="opacity" values="1; 1; 0; 0; 1" keyTimes="0; 0.94; 0.95; 0.99; 1" dur="10s" repeatCount="indefinite" />
+          <!-- Arrows from energy sources down to featurize -->
+          <!-- FR -->
+          <line x1="113" y1="124" x2="113" y2="164" stroke="#00ff88" stroke-width="1.2" stroke-dasharray="5 3" marker-end="url(#dp-arr-green)">
+            <animate attributeName="stroke-dashoffset" from="0" to="-16" dur="1.4s" repeatCount="indefinite"/>
+          </line>
+          <!-- UK -->
+          <line x1="243" y1="124" x2="243" y2="164" stroke="#00ff88" stroke-width="1.2" stroke-dasharray="5 3" marker-end="url(#dp-arr-green)">
+            <animate attributeName="stroke-dashoffset" from="0" to="-16" dur="1.6s" repeatCount="indefinite"/>
+          </line>
+          <!-- FI -->
+          <line x1="373" y1="124" x2="373" y2="164" stroke="#00ff88" stroke-width="1.2" stroke-dasharray="5 3" marker-end="url(#dp-arr-green)">
+            <animate attributeName="stroke-dashoffset" from="0" to="-16" dur="1.3s" repeatCount="indefinite"/>
+          </line>
+          <!-- IT -->
+          <line x1="503" y1="124" x2="503" y2="164" stroke="#00ff88" stroke-width="1.2" stroke-dasharray="5 3" marker-end="url(#dp-arr-green)">
+            <animate attributeName="stroke-dashoffset" from="0" to="-16" dur="1.5s" repeatCount="indefinite"/>
+          </line>
+          <!-- Weather -->
+          <line x1="720" y1="124" x2="615" y2="164" stroke="#4a9eff" stroke-width="1.2" stroke-dasharray="5 3" marker-end="url(#dp-arr-blue)">
+            <animate attributeName="stroke-dashoffset" from="0" to="-16" dur="1.7s" repeatCount="indefinite"/>
+          </line>
 
-    <!-- Job Box -->
-    <rect width="140" height="60" rx="8" fill="url(#jobGrad)" filter="url(#shadow-md)" />
-    
-    <!-- State Label -->
-    <g transform="translate(70, -10)">
-      <rect x="-40" y="-12" width="80" height="20" rx="10" fill="#0c1f16" stroke="#6366f1" stroke-width="1.5" />
-      <text x="0" y="2" font-size="10" font-weight="bold" fill="#4f46e5" text-anchor="middle">
-        <tspan>
-          <animate attributeName="opacity" values="1;1;0;0;1" keyTimes="0;0.34;0.35;0.45;1" dur="10s" repeatCount="indefinite"/>
-          Running
-        </tspan>
-        <tspan x="0" y="2" opacity="0">
-          <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.34;0.35;0.45;1" dur="10s" repeatCount="indefinite"/>
-          Migrating...
-        </tspan>
-        <tspan x="0" y="2" opacity="0">
-          <animate attributeName="opacity" values="0;0;0;1;0" keyTimes="0;0.44;0.45;0.94;1" dur="10s" repeatCount="indefinite"/>
-          Running
-        </tspan>
-      </text>
-    </g>
+          <!-- Featurize box -->
+          <g transform="translate(58, 164)">
+            <rect width="820" height="52" rx="4" fill="rgba(0,255,136,0.06)" stroke="#00ff88" stroke-width="1.5" filter="url(#dp-glow-sm)"/>
+            <rect x="0" y="-1" width="90" height="13" rx="2" fill="rgba(0,255,136,0.12)" stroke="rgba(0,255,136,0.3)" stroke-width="0.5"/>
+            <text x="8" y="9" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" letter-spacing="2">TRANSFORM</text>
+            <text x="16" y="28" font-family="IBM Plex Mono" font-size="12" fill="#00ff88" font-weight="700" letter-spacing="1">Featurize</text>
+            <text x="16" y="42" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">lag features (1–24h) · rolling stats (mean, std) · calendar signals (hour, dow, month) · weather interaction terms · target: surplus = generation − load</text>
+          </g>
 
-    <!-- GPU / Brain icon approximation -->
-    <rect x="10" y="10" width="24" height="24" rx="4" fill="#0c1f16" fill-opacity="0.2" />
-    <circle cx="22" cy="22" r="4" fill="#0c1f16" />
-    <path d="M 16 22 L 28 22 M 22 16 L 22 28" stroke="#ffffff" stroke-width="2" />
+          <!-- ============================================================ -->
+          <!-- ROW 3: 4 ML MODELS (y=270) -->
+          <!-- ============================================================ -->
 
-    <!-- Job Details -->
-    <text x="42" y="20" fill="#0c1f16" font-size="11" font-weight="bold">Job: ResNet-101</text>
-    <text x="42" y="34" fill="#e0e7ff" font-size="9">Epoch Progress</text>
-    
-    <!-- Progress Bar inside Job Box -->
-    <rect x="10" y="44" width="120" height="6" rx="3" fill="#050A08" />
-    <rect x="10" y="44" width="0" height="6" rx="3" fill="#34d399">
-      <animate attributeName="width" values="10; 40; 45; 45; 110; 120; 10" keyTimes="0; 0.35; 0.4; 0.45; 0.94; 0.95; 1" dur="10s" repeatCount="indefinite" />
-    </rect>
-  </g>
+          <!-- Fan-out arrows from featurize to 4 models -->
+          <!-- FR model arrow -->
+          <line x1="113" y1="216" x2="153" y2="262" stroke="rgba(0,255,136,0.6)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#dp-arr-green)">
+            <animate attributeName="stroke-dashoffset" from="0" to="-14" dur="1.5s" repeatCount="indefinite"/>
+          </line>
+          <!-- UK model arrow -->
+          <line x1="243" y1="216" x2="359" y2="262" stroke="rgba(0,255,136,0.6)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#dp-arr-green)">
+            <animate attributeName="stroke-dashoffset" from="0" to="-14" dur="1.3s" repeatCount="indefinite"/>
+          </line>
+          <!-- FI model arrow -->
+          <line x1="373" y1="216" x2="565" y2="262" stroke="rgba(0,255,136,0.6)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#dp-arr-green)">
+            <animate attributeName="stroke-dashoffset" from="0" to="-14" dur="1.7s" repeatCount="indefinite"/>
+          </line>
+          <!-- IT model arrow -->
+          <line x1="503" y1="216" x2="771" y2="262" stroke="rgba(0,255,136,0.6)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#dp-arr-green)">
+            <animate attributeName="stroke-dashoffset" from="0" to="-14" dur="1.4s" repeatCount="indefinite"/>
+          </line>
 
+          <!-- Models container -->
+          <rect x="48" y="262" width="830" height="130" rx="4" fill="#0a1218" stroke="#00ff88" stroke-width="1" stroke-dasharray="4 3"/>
+          <text x="64" y="257" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" letter-spacing="2">ENERGY GAP FORECASTING MODELS — ONE PER COUNTRY · XGBoost · 5-fold TimeSeriesSplit CV</text>
 
-  <!-- ================= SYSTEM LOG / ACTION CONSOLE (BOTTOM) ================= -->
-  
-  <g transform="translate(50, 460)">
-    <!-- Console Background -->
-    <rect width="700" height="50" rx="8" fill="#0f2018" stroke="#1e3a2f" stroke-width="1.5" />
-    <!-- Little terminal dots -->
-    <circle cx="20" cy="25" r="4" fill="#10b981" />
-    
-    <!-- Log Line 1: Placement -->
-    <text x="35" y="29" fill="#e2f0e8" font-size="13" font-family="monospace">
-      <animate attributeName="opacity" values="1; 1; 0; 0" keyTimes="0; 0.25; 0.26; 1" dur="10s" repeatCount="indefinite" />
-      <tspan fill="#6b9e7e">[00:00]</tspan> <tspan fill="#00FF66">Placement Plan:</tspan> Assigned to FR due to sustained surplus delta(t).
-    </text>
-    
-    <!-- Log Line 2: Alert / Forecast Evaluation -->
-    <text x="35" y="29" fill="#e2f0e8" font-size="13" font-family="monospace" opacity="0">
-      <animate attributeName="opacity" values="0; 0; 1; 1; 0; 0" keyTimes="0; 0.25; 0.26; 0.34; 0.35; 1" dur="10s" repeatCount="indefinite" />
-      <tspan fill="#6b9e7e">[00:45]</tspan> <tspan fill="#f59e0b">Adaptive Alert:</tspan> FR surplus ending. DE surplus rising. Triggering Warm-start...
-    </text>
-    
-    <!-- Log Line 3: Migration -->
-    <text x="35" y="29" fill="#e2f0e8" font-size="13" font-family="monospace" opacity="0">
-      <animate attributeName="opacity" values="0; 0; 1; 1; 0; 0" keyTimes="0; 0.34; 0.35; 0.44; 0.45; 1" dur="10s" repeatCount="indefinite" />
-      <tspan fill="#6b9e7e">[01:00]</tspan> <tspan fill="#6366f1">Migration:</tspan> Checkpointing model state &amp; transferring to DE...
-    </text>
+          <!-- ── FRANCE MODEL ── -->
+          <g transform="translate(58, 272)">
+            <rect width="190" height="110" rx="3" fill="#0c1419" stroke="#00ff88" stroke-width="1"/>
+            <rect x="0" y="-1" width="70" height="13" rx="2" fill="rgba(0,255,136,0.1)" stroke="rgba(0,255,136,0.25)" stroke-width="0.5"/>
+            <text x="6" y="9" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" letter-spacing="1">FRANCE 🇫🇷</text>
+            <!-- metrics grid -->
+            <text x="10" y="30" font-family="IBM Plex Mono" font-size="7" fill="#64748b">MAE h+1</text>
+            <text x="95" y="30" font-family="IBM Plex Mono" font-size="8" fill="#00ff88" font-weight="700">811 MW</text>
+            <text x="10" y="44" font-family="IBM Plex Mono" font-size="7" fill="#64748b">R²  h+1</text>
+            <text x="95" y="44" font-family="IBM Plex Mono" font-size="8" fill="#00ff88" font-weight="700">0.883</text>
+            <text x="10" y="58" font-family="IBM Plex Mono" font-size="7" fill="#64748b">MAE h+12</text>
+            <text x="95" y="58" font-family="IBM Plex Mono" font-size="8" fill="#94a3b8">2 410 MW</text>
+            <text x="10" y="72" font-family="IBM Plex Mono" font-size="7" fill="#64748b">R²  h+12</text>
+            <text x="95" y="72" font-family="IBM Plex Mono" font-size="8" fill="#94a3b8">0.131</text>
+            <!-- R² decay bar -->
+            <text x="10" y="88" font-family="IBM Plex Mono" font-size="6" fill="#4a6070">R² decay h+1→h+12</text>
+            <rect x="10" y="93" width="170" height="4" rx="2" fill="#0f1820"/>
+            <rect x="10" y="93" width="150" height="4" rx="2" fill="url(#dp-bar-fr)"/>
+            <defs><linearGradient id="dp-bar-fr" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#00ff88"/><stop offset="100%" stop-color="#1a3a28"/></linearGradient></defs>
+            <text x="10" y="108" font-family="IBM Plex Mono" font-size="6" fill="#4a6070">0.883</text>
+            <text x="150" y="108" font-family="IBM Plex Mono" font-size="6" fill="#4a6070" text-anchor="end">0.131</text>
+          </g>
 
-    <!-- Log Line 4: Resumed -->
-    <text x="35" y="29" fill="#e2f0e8" font-size="13" font-family="monospace" opacity="0">
-      <animate attributeName="opacity" values="0; 0; 1; 1; 0" keyTimes="0; 0.44; 0.45; 0.98; 1" dur="10s" repeatCount="indefinite" />
-      <tspan fill="#6b9e7e">[01:15]</tspan> <tspan fill="#10b981">Resumed:</tspan> Training continues in DE. 100% green energy maintained.
-    </text>
-  </g>
+          <!-- ── UK MODEL ── -->
+          <g transform="translate(264, 272)">
+            <rect width="190" height="110" rx="3" fill="#0c1419" stroke="#00ff88" stroke-width="1"/>
+            <rect x="0" y="-1" width="55" height="13" rx="2" fill="rgba(0,255,136,0.1)" stroke="rgba(0,255,136,0.25)" stroke-width="0.5"/>
+            <text x="6" y="9" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" letter-spacing="1">UK 🇬🇧</text>
+            <text x="10" y="30" font-family="IBM Plex Mono" font-size="7" fill="#64748b">MAE h+1</text>
+            <text x="95" y="30" font-family="IBM Plex Mono" font-size="8" fill="#00ff88" font-weight="700">438 MW</text>
+            <text x="10" y="44" font-family="IBM Plex Mono" font-size="7" fill="#64748b">R²  h+1</text>
+            <text x="95" y="44" font-family="IBM Plex Mono" font-size="8" fill="#00ff88" font-weight="700">0.855</text>
+            <text x="10" y="58" font-family="IBM Plex Mono" font-size="7" fill="#64748b">MAE h+12</text>
+            <text x="95" y="58" font-family="IBM Plex Mono" font-size="8" fill="#94a3b8">1 704 MW</text>
+            <text x="10" y="72" font-family="IBM Plex Mono" font-size="7" fill="#64748b">R²  h+12</text>
+            <text x="95" y="72" font-family="IBM Plex Mono" font-size="8" fill="#94a3b8">0.111</text>
+            <text x="10" y="88" font-family="IBM Plex Mono" font-size="6" fill="#4a6070">R² decay h+1→h+12</text>
+            <rect x="10" y="93" width="170" height="4" rx="2" fill="#0f1820"/>
+            <rect x="10" y="93" width="135" height="4" rx="2" fill="url(#dp-bar-uk)"/>
+            <defs><linearGradient id="dp-bar-uk" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#00ff88"/><stop offset="100%" stop-color="#1a3a28"/></linearGradient></defs>
+            <text x="10" y="108" font-family="IBM Plex Mono" font-size="6" fill="#4a6070">0.855</text>
+            <text x="150" y="108" font-family="IBM Plex Mono" font-size="6" fill="#4a6070" text-anchor="end">0.111</text>
+          </g>
+          
+          <!-- ── FINLAND MODEL ── -->
+          <g transform="translate(470, 272)">
+            <rect width="190" height="110" rx="3" fill="#0c1419" stroke="#00ff88" stroke-width="1"/>
+            <rect x="0" y="-1" width="80" height="13" rx="2" fill="rgba(0,255,136,0.1)" stroke="rgba(0,255,136,0.25)" stroke-width="0.5"/>
+            <text x="6" y="9" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" letter-spacing="1">FINLAND 🇫🇮</text>
+            <text x="10" y="30" font-family="IBM Plex Mono" font-size="7" fill="#64748b">MAE h+1</text>
+            <text x="95" y="30" font-family="IBM Plex Mono" font-size="8" fill="#00ff88" font-weight="700">202 MW</text>
+            <text x="10" y="44" font-family="IBM Plex Mono" font-size="7" fill="#64748b">R²  h+1</text>
+            <text x="95" y="44" font-family="IBM Plex Mono" font-size="8" fill="#00ff88" font-weight="700">0.934</text>
+            <text x="10" y="58" font-family="IBM Plex Mono" font-size="7" fill="#64748b">MAE h+12</text>
+            <text x="95" y="58" font-family="IBM Plex Mono" font-size="8" fill="#94a3b8">687 MW</text>
+            <text x="10" y="72" font-family="IBM Plex Mono" font-size="7" fill="#64748b">R²  h+12</text>
+            <text x="95" y="72" font-family="IBM Plex Mono" font-size="8" fill="#94a3b8">0.259</text>
+            <text x="10" y="88" font-family="IBM Plex Mono" font-size="6" fill="#4a6070">R² decay h+1→h+12</text>
+            <rect x="10" y="93" width="170" height="4" rx="2" fill="#0f1820"/>
+            <rect x="10" y="93" width="158" height="4" rx="2" fill="url(#dp-bar-fi)"/>
+            <defs><linearGradient id="dp-bar-fi" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#00ff88"/><stop offset="100%" stop-color="#1a3a28"/></linearGradient></defs>
+            <text x="10" y="108" font-family="IBM Plex Mono" font-size="6" fill="#4a6070">0.934</text>
+            <text x="150" y="108" font-family="IBM Plex Mono" font-size="6" fill="#4a6070" text-anchor="end">0.259</text>
+          </g>
 
-</svg>
+          <!-- ── ITALY MODEL ── -->
+          <g transform="translate(676, 272)">
+            <rect width="190" height="110" rx="3" fill="#0c1419" stroke="#00ff88" stroke-width="1"/>
+            <rect x="0" y="-1" width="65" height="13" rx="2" fill="rgba(0,255,136,0.1)" stroke="rgba(0,255,136,0.25)" stroke-width="0.5"/>
+            <text x="6" y="9" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" letter-spacing="1">ITALY 🇮🇹</text>
+            <text x="10" y="30" font-family="IBM Plex Mono" font-size="7" fill="#64748b">MAE h+1</text>
+            <text x="95" y="30" font-family="IBM Plex Mono" font-size="8" fill="#00ff88" font-weight="700">557 MW</text>
+            <text x="10" y="44" font-family="IBM Plex Mono" font-size="7" fill="#64748b">R²  h+1</text>
+            <text x="95" y="44" font-family="IBM Plex Mono" font-size="8" fill="#00ff88" font-weight="700">0.775</text>
+            <text x="10" y="58" font-family="IBM Plex Mono" font-size="7" fill="#64748b">MAE h+12</text>
+            <text x="95" y="58" font-family="IBM Plex Mono" font-size="8" fill="#94a3b8">1 246 MW</text>
+            <text x="10" y="72" font-family="IBM Plex Mono" font-size="7" fill="#64748b">R²  h+12</text>
+            <text x="95" y="72" font-family="IBM Plex Mono" font-size="8" fill="#94a3b8">0.065</text>
+            <text x="10" y="88" font-family="IBM Plex Mono" font-size="6" fill="#4a6070">R² decay h+1→h+12</text>
+            <rect x="10" y="93" width="170" height="4" rx="2" fill="#0f1820"/>
+            <rect x="10" y="93" width="142" height="4" rx="2" fill="url(#dp-bar-it)"/>
+            <defs><linearGradient id="dp-bar-it" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#00ff88"/><stop offset="100%" stop-color="#1a3a28"/></linearGradient></defs>
+            <text x="10" y="108" font-family="IBM Plex Mono" font-size="6" fill="#4a6070">0.775</text>
+            <text x="150" y="108" font-family="IBM Plex Mono" font-size="6" fill="#4a6070" text-anchor="end">0.065</text>
+          </g>
+
+          <!-- ============================================================ -->
+          <!-- ROW 4: OUTPUT — Energy Gap Forecast -->
+          <!-- ============================================================ -->
+
+          <!-- Converging arrows from models to output -->
+          <line x1="153" y1="382" x2="153" y2="412" stroke="#00ff88" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#dp-arr-green)">
+            <animate attributeName="stroke-dashoffset" from="0" to="-14" dur="1.4s" repeatCount="indefinite"/>
+          </line>
+          <line x1="359" y1="382" x2="359" y2="412" stroke="#00ff88" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#dp-arr-green)">
+            <animate attributeName="stroke-dashoffset" from="0" to="-14" dur="1.6s" repeatCount="indefinite"/>
+          </line>
+          <line x1="565" y1="382" x2="565" y2="412" stroke="#00ff88" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#dp-arr-green)">
+            <animate attributeName="stroke-dashoffset" from="0" to="-14" dur="1.3s" repeatCount="indefinite"/>
+          </line>
+          <line x1="771" y1="382" x2="771" y2="412" stroke="#00ff88" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#dp-arr-green)">
+            <animate attributeName="stroke-dashoffset" from="0" to="-14" dur="1.5s" repeatCount="indefinite"/>
+          </line>
+
+          <!-- Output box -->
+          <g transform="translate(48, 412)">
+            <rect width="730" height="50" rx="4" fill="rgba(0,255,136,0.08)" stroke="#00ff88" stroke-width="2" filter="url(#dp-glow)"/>
+            <rect x="0" y="-1" width="145" height="13" rx="2" fill="rgba(0,255,136,0.15)" stroke="rgba(0,255,136,0.4)" stroke-width="0.5"/>
+            <text x="8" y="9" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" letter-spacing="2">FORECAST OUTPUT</text>
+            <text x="18" y="28" font-family="IBM Plex Mono" font-size="11" fill="#00ff88" font-weight="700">Energy Gap Forecast  →  1h · 2h · 4h · 6h · 12h horizons</text>
+            <text x="18" y="43" font-family="IBM Plex Mono" font-size="8" fill="#64748b">Router picks country with largest predicted surplus window for incoming job</text>
+          </g>
+
+          <!-- Coverage + best model badges (right of output) -->
+          <g transform="translate(794, 412)">
+            <rect width="108" height="50" rx="4" fill="rgba(0,229,255,0.06)" stroke="#00e5ff" stroke-width="1"/>
+            <text x="54" y="16" font-family="IBM Plex Mono" font-size="7" fill="#00e5ff" text-anchor="middle" font-weight="600">ROUTEABLE</text>
+            <text x="54" y="34" font-family="IBM Plex Mono" font-size="18" fill="#00e5ff" text-anchor="middle" font-weight="700" filter="url(#dp-glow-sm)">95%</text>
+            <text x="54" y="47" font-family="IBM Plex Mono" font-size="6" fill="#4a6070" text-anchor="middle">of the week</text>
+          </g>
+          <g transform="translate(910, 412)">
+            <rect width="168" height="50" rx="4" fill="rgba(0,255,136,0.05)" stroke="rgba(0,255,136,0.3)" stroke-width="1"/>
+            <text x="10" y="16" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" font-weight="600">Best model: Finland 🇫🇮</text>
+            <text x="10" y="30" font-family="IBM Plex Mono" font-size="7" fill="#94a3b8">MAE h+1  202 MW</text>
+            <text x="10" y="43" font-family="IBM Plex Mono" font-size="7" fill="#94a3b8">R²  h+1   0.934</text>
+          </g>
+        </svg>
       </div>
-      <p class="text-slate-500 text-sm mt-3 text-center font-mono">
-        Live animation — job migrates between regions as energy surplus shifts across countries
+
+      <p class="text-slate-500 text-sm mt-2 text-center">
+        XGBoost · 5-fold TimeSeriesSplit CV · holdout week 2026-02-09→16 · Finland best model: MAE h+1 = 202 MW, R² = 0.934
       </p>
     </div>
   </div>
@@ -983,9 +1025,13 @@
         </div>
 
         <div class="glass-panel p-8 rounded-2xl flex flex-col justify-between">
-          <i data-lucide="trending-down" class="text-slate-500 mb-4 w-8 h-8"></i>
-          <div class="hero-number text-5xl font-bold text-[#00FF66] mb-2 text-glow">48<span class="text-white">%</span></div>
-          <p class="text-slate-400 text-sm">Cost reduction for users tolerating scheduling delays.</p>
+        <i data-lucide="leaf" class="text-slate-500 mb-4 w-8 h-8"></i>
+        <div class="hero-number text-5xl font-bold text-[#00FF66] mb-2 text-glow">
+            99<span class="text-white">%</span>
+        </div>
+        <p class="text-slate-400 text-sm">
+            Lower carbon intensity vs EU grid baseline during surplus windows.
+        </p>
         </div>
 
         <div class="glass-panel p-8 rounded-2xl flex flex-col justify-between">
@@ -996,8 +1042,8 @@
 
         <div class="glass-panel p-8 rounded-2xl flex flex-col justify-between">
           <i data-lucide="target" class="text-slate-500 mb-4 w-8 h-8"></i>
-          <div class="hero-number text-5xl font-bold text-white mb-2">157<span class="text-xl text-[#00FF66] uppercase"> MW</span></div>
-          <p class="text-slate-400 text-sm">Finland ML Model MAE h+1 reliability baseline.</p>
+          <div class="hero-number text-5xl font-bold text-white mb-2">0.86<span class="text-xl text-[#00FF66] uppercase"> R²</span></div>
+          <p class="text-slate-400 text-sm">Consistent one-hour-ahead accuracy across major European power markets.</p>
         </div>
       </div>
       

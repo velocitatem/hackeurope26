@@ -23,7 +23,7 @@ ml/data/fin/*
 ml/data/fr/*
 ml/data/uk/*
 ml/data/weather-data/*
-*.png
+# *.png
 *.csv
 .DS_Store
 ml/data/weather-data/country_dfs
@@ -31,3 +31,8 @@ ml/data/weather-data/country_dfs
 ml/data/uk/uk-dataml/data/uk/uk-data/generation.csv
 ml/data/uk/uk-data/generation.csv
 ml/data/uk/uk-data/generation.csv
+ml/data/test_multi_horizon_ita.parquet
+.gitignore
+ml/data/test_multi_horizon_uk.parquet
+ml/fin/fin_y_test_predictions.parquet
+ml/fr/fr_model.ipynb
