@@ -111,38 +111,67 @@ class UKOnnxBundle:
 
 class TabularCountryModels:
     def __init__(self) -> None:
-        base_dir = Path(__file__).resolve().parent
-        self.model_paths = {
-            "FR": Path(
-                os.getenv("ML_FR_MODEL_PATH", str(base_dir / "fr" / "fr_model.joblib"))
+        self.base_dir = Path(__file__).resolve().parent
+        self.model_path_candidates = {
+            "FR": self._build_candidates(
+                geo="FR", env_key="ML_FR_MODEL_PATH", default_name="fr_model.joblib"
             ),
-            "FIN": Path(
-                os.getenv(
-                    "ML_FIN_MODEL_PATH", str(base_dir / "fin" / "fin_model.joblib")
-                )
+            "FIN": self._build_candidates(
+                geo="FIN",
+                env_key="ML_FIN_MODEL_PATH",
+                default_name="fin_model.joblib",
             ),
-            "IT": Path(
-                os.getenv("ML_IT_MODEL_PATH", str(base_dir / "it" / "it_model.joblib"))
+            "IT": self._build_candidates(
+                geo="IT", env_key="ML_IT_MODEL_PATH", default_name="it_model.joblib"
             ),
         }
         self.models: dict[str, Any] = {}
+        self.loaded_model_paths: dict[str, str] = {}
         self.load_errors: dict[str, str] = {}
         self._load_models()
 
+    def _build_candidates(
+        self, geo: str, env_key: str, default_name: str
+    ) -> list[Path]:
+        env_value = os.getenv(env_key)
+        if env_value:
+            return [Path(env_value)]
+
+        geo_dir = self.base_dir / geo.lower()
+        candidates = [geo_dir / default_name]
+        if geo_dir.exists():
+            for candidate in sorted(geo_dir.glob("*.joblib")):
+                if candidate not in candidates:
+                    candidates.append(candidate)
+        return candidates
+
     def _load_models(self) -> None:
         if joblib is None:
-            for geo in self.model_paths:
+            for geo in self.model_path_candidates:
                 self.load_errors[geo] = "missing dependency: joblib"
             return
 
-        for geo, path in self.model_paths.items():
-            if not path.exists():
-                self.load_errors[geo] = f"model file not found: {path}"
+        for geo, candidates in self.model_path_candidates.items():
+            load_failure: str | None = None
+            for path in candidates:
+                if not path.exists():
+                    continue
+                try:
+                    self.models[geo] = joblib.load(path)
+                    self.loaded_model_paths[geo] = str(path)
+                    load_failure = None
+                    break
+                except Exception as exc:
+                    load_failure = f"failed to load model from {path}: {exc}"
+
+            if geo in self.models:
                 continue
-            try:
-                self.models[geo] = joblib.load(path)
-            except Exception as exc:
-                self.load_errors[geo] = f"failed to load model: {exc}"
+
+            if load_failure is not None:
+                self.load_errors[geo] = load_failure
+            else:
+                checked = ", ".join(str(path) for path in candidates)
+                self.load_errors[geo] = f"model file not found; checked: {checked}"
 
     def is_loaded(self, geo: str) -> bool:
         return geo in self.models
@@ -166,6 +195,22 @@ class TabularCountryModels:
 
         return None
 
+    def feature_names(self, geo: str) -> list[str] | None:
+        model = self.models.get(geo)
+        if model is None:
+            return None
+
+        if hasattr(model, "feature_names_in_"):
+            return [str(name) for name in model.feature_names_in_]
+
+        estimators = getattr(model, "estimators_", None)
+        if estimators:
+            first = estimators[0]
+            if hasattr(first, "feature_names_in_"):
+                return [str(name) for name in first.feature_names_in_]
+
+        return None
+
 
 class QuantifidFeatureStore:
     def __init__(self) -> None:
@@ -175,7 +220,11 @@ class QuantifidFeatureStore:
                 str(Path(__file__).resolve().parent / "features_quantifid"),
             )
         )
+        self.synthetic_enabled = (
+            os.getenv("ML_SYNTHETIC_FEATURES", "true").strip().lower() == "true"
+        )
         self.vectors: dict[str, list[list[float]]] = {}
+        self.columns: dict[str, list[str]] = {}
         self.feature_count: dict[str, int] = {}
         self.load_errors: dict[str, str] = {}
         self._load()
@@ -210,6 +259,7 @@ class QuantifidFeatureStore:
                     else:
                         prepared[col] = pd.to_numeric(series, errors="coerce")
                 prepared = prepared.fillna(0.0)
+                self.columns[geo] = [str(col) for col in prepared.columns]
                 matrix = prepared.astype("float32").values.tolist()
                 self.vectors[geo] = matrix
                 self.feature_count[geo] = int(len(matrix[0]))
@@ -219,29 +269,132 @@ class QuantifidFeatureStore:
     def has_geo(self, geo: str) -> bool:
         return geo in self.vectors and len(self.vectors[geo]) > 0
 
-    def vector_for(self, geo: str, t: float, horizon_h: int) -> list[float]:
+    def can_synthesize(
+        self,
+        expected_feature_names: list[str] | None,
+        expected_size: int | None,
+    ) -> bool:
+        if not self.synthetic_enabled:
+            return False
+        if expected_feature_names:
+            return True
+        return (expected_size or 0) > 0
+
+    def _synthetic_feature_value(self, name: str, t: float) -> float:
+        key = name.lower()
+        hour = int((t // SECONDS_PER_HOUR) % 24)
+        dow = int((t // SECONDS_PER_DAY) % 7)
+        month = int(((t // SECONDS_PER_DAY) // 30) % 12) + 1
+        day_pos = (t % SECONDS_PER_DAY) / float(SECONDS_PER_DAY)
+        week_pos = (t % (7 * SECONDS_PER_DAY)) / float(7 * SECONDS_PER_DAY)
+
+        if key == "hour":
+            return float(hour)
+        if key == "dow":
+            return float(dow)
+        if key == "month":
+            return float(month)
+        if key == "hour_sin":
+            return float(math.sin(2.0 * math.pi * day_pos))
+        if key == "hour_cos":
+            return float(math.cos(2.0 * math.pi * day_pos))
+        if key == "dow_sin":
+            return float(math.sin(2.0 * math.pi * week_pos))
+        if key == "dow_cos":
+            return float(math.cos(2.0 * math.pi * week_pos))
+        if key == "month_sin":
+            return float(math.sin(2.0 * math.pi * month / 12.0))
+        if key == "month_cos":
+            return float(math.cos(2.0 * math.pi * month / 12.0))
+        if "share" in key:
+            return 0.25
+        if "ratio" in key or "surprise" in key or "imbalance" in key:
+            return 0.0
+        if "lag_" in key or "roll_" in key or "ewm" in key:
+            return 0.0
+        if "gap" in key:
+            return 0.0
+        if key in {
+            "temperature_2m",
+            "relative_humidity_2m",
+            "precipitation",
+            "wind_speed_10m",
+            "wind_direction_10m",
+            "surface_pressure",
+            "cloud_cover",
+        }:
+            return 0.0
+        return 0.0
+
+    def _synthesized_vector(
+        self,
+        t: float,
+        expected_feature_names: list[str] | None,
+        expected_size: int | None,
+    ) -> list[float]:
+        if expected_feature_names:
+            vector = [
+                float(self._synthetic_feature_value(name, t))
+                for name in expected_feature_names
+            ]
+        elif expected_size is not None:
+            vector = [0.0] * int(expected_size)
+        else:
+            raise ValueError("cannot synthesize vector without model feature metadata")
+
+        if expected_size is not None and len(vector) != expected_size:
+            if len(vector) < expected_size:
+                vector = [*vector, *([0.0] * (expected_size - len(vector)))]
+            else:
+                vector = vector[:expected_size]
+        return vector
+
+    def vector_for(
+        self,
+        geo: str,
+        t: float,
+        horizon_h: int,
+        expected_feature_names: list[str] | None,
+        expected_size: int | None,
+    ) -> list[float]:
         rows = self.vectors.get(geo)
-        if not rows:
-            raise ValueError(f"no hardcoded feature vectors for {geo}")
-        seed = int(max(0.0, t)) // SECONDS_PER_HOUR
-        idx = int((seed + max(1, horizon_h)) % len(rows))
-        return rows[idx]
+        if rows:
+            seed = int(max(0.0, t)) // SECONDS_PER_HOUR
+            idx = int((seed + max(1, horizon_h)) % len(rows))
+            row = rows[idx]
 
-    def feature_names(self, geo: str) -> list[str] | None:
-        model = self.models.get(geo)
-        if model is None:
-            return None
+            if expected_feature_names:
+                columns = self.columns.get(geo, [])
+                row_map = {
+                    columns[col_idx]: float(value)
+                    for col_idx, value in enumerate(row)
+                    if col_idx < len(columns)
+                }
+                vector = [
+                    float(row_map.get(name, self._synthetic_feature_value(name, t)))
+                    for name in expected_feature_names
+                ]
+            else:
+                vector = [float(value) for value in row]
+        else:
+            if not self.can_synthesize(
+                expected_feature_names=expected_feature_names,
+                expected_size=expected_size,
+            ):
+                raise ValueError(f"no hardcoded feature vectors for {geo}")
+            vector = self._synthesized_vector(
+                t=t,
+                expected_feature_names=expected_feature_names,
+                expected_size=expected_size,
+            )
 
-        if hasattr(model, "feature_names_in_"):
-            return [str(name) for name in model.feature_names_in_]
+        if expected_size is not None and len(vector) != expected_size:
+            if len(vector) < expected_size:
+                vector = [*vector, *([0.0] * (expected_size - len(vector)))]
+            else:
+                vector = vector[:expected_size]
 
-        estimators = getattr(model, "estimators_", None)
-        if estimators:
-            first = estimators[0]
-            if hasattr(first, "feature_names_in_"):
-                return [str(name) for name in first.feature_names_in_]
-
-        return None
+        return vector
 
 
 _UK_MODELS = UKOnnxBundle()
@@ -252,12 +405,6 @@ _FEATURE_STORE = QuantifidFeatureStore()
 def _normalize_geo(geo: str) -> str:
     normalized = geo.strip().upper()
     return GEO_ALIASES.get(normalized, normalized)
-
-
-def _mock_delta_at(t: float) -> float:
-    return float(
-        6.5 * math.sin((2.0 * math.pi * t / SECONDS_PER_DAY) - (math.pi / 10.0))
-    )
 
 
 def _time_features(t: float) -> list[float]:
@@ -304,14 +451,71 @@ def _predict_uk_delta(t: float, horizon_h: int) -> tuple[float, int]:
 
 
 def _resolve_feature_vector(geo: str, t: float, horizon_h: int) -> list[float]:
-    vector = _FEATURE_STORE.vector_for(geo=geo, t=t, horizon_h=horizon_h)
     expected = _TABULAR_MODELS.required_features(geo)
-    if expected is not None and len(vector) != expected:
-        if len(vector) < expected:
-            vector = [*vector, *([0.0] * (expected - len(vector)))]
-        else:
-            vector = vector[:expected]
+    feature_names = _TABULAR_MODELS.feature_names(geo)
+    vector = _FEATURE_STORE.vector_for(
+        geo=geo,
+        t=t,
+        horizon_h=horizon_h,
+        expected_feature_names=feature_names,
+        expected_size=expected,
+    )
     return [float(v) for v in vector]
+
+
+def _predict_regressor_chain_manual(model: Any, x: "np.ndarray") -> "np.ndarray":
+    estimators = getattr(model, "estimators_", None)
+    if not estimators:
+        raise ValueError("RegressorChain has no fitted estimators_")
+
+    n_outputs = int(len(estimators))
+    n_samples = int(x.shape[0])
+
+    order_raw = getattr(model, "order_", None)
+    if order_raw is None:
+        order_raw = getattr(model, "order", None)
+
+    if order_raw is None or str(order_raw).lower() == "random":
+        order = list(range(n_outputs))
+    else:
+        order = [int(v) for v in list(order_raw)]
+        if len(order) != n_outputs:
+            order = list(range(n_outputs))
+
+    chain_preds = np.zeros((n_samples, n_outputs), dtype=np.float32)
+    for chain_idx, estimator in enumerate(estimators):
+        if chain_idx == 0:
+            x_aug = x
+        else:
+            x_aug = np.hstack((x, chain_preds[:, :chain_idx]))
+        pred = np.asarray(estimator.predict(x_aug), dtype=np.float32).reshape(-1)
+        if pred.size != n_samples:
+            raise ValueError(
+                f"RegressorChain estimator output size mismatch at step {chain_idx}: "
+                f"got {pred.size}, expected {n_samples}"
+            )
+        chain_preds[:, chain_idx] = pred
+
+    y = np.zeros((n_samples, n_outputs), dtype=np.float32)
+    for chain_idx, target_idx in enumerate(order):
+        if 0 <= target_idx < n_outputs:
+            y[:, target_idx] = chain_preds[:, chain_idx]
+    return y
+
+
+def _predict_tabular_raw(model: Any, x: "np.ndarray") -> "np.ndarray":
+    is_regressor_chain = hasattr(model, "estimators_") and (
+        hasattr(model, "order") or hasattr(model, "order_")
+    )
+    if not is_regressor_chain:
+        return np.asarray(model.predict(x), dtype=np.float32)
+
+    try:
+        return np.asarray(model.predict(x), dtype=np.float32)
+    except Exception as exc:
+        if "RegressorChain" not in str(exc):
+            raise
+        return _predict_regressor_chain_manual(model=model, x=x)
 
 
 def _predict_tabular_delta(
@@ -323,7 +527,7 @@ def _predict_tabular_delta(
     vector = _resolve_feature_vector(geo=geo, t=t, horizon_h=horizon_h)
     x = np.asarray([vector], dtype=np.float32)
 
-    y = model.predict(x)
+    y = _predict_tabular_raw(model=model, x=x)
     flat = np.asarray(y, dtype=np.float32).reshape(-1)
     if flat.size == 0:
         raise ValueError("model returned empty prediction")
@@ -356,6 +560,19 @@ def _predict_tabular_series(
     return points
 
 
+def _vector_source_for_geo(geo: str) -> str:
+    if _FEATURE_STORE.has_geo(geo):
+        return "hardcoded_parquet"
+    expected = _TABULAR_MODELS.required_features(geo)
+    feature_names = _TABULAR_MODELS.feature_names(geo)
+    if _FEATURE_STORE.can_synthesize(
+        expected_feature_names=feature_names,
+        expected_size=expected,
+    ):
+        return "synthetic_from_model_schema"
+    return "missing"
+
+
 def _geo_readiness_error(geo: str) -> str | None:
     if np is None:
         return "numpy is required for inference"
@@ -368,7 +585,7 @@ def _geo_readiness_error(geo: str) -> str | None:
             return _TABULAR_MODELS.load_errors.get(
                 geo, f"{geo} tabular model is not loaded"
             )
-        if not _FEATURE_STORE.has_geo(geo):
+        if _vector_source_for_geo(geo) == "missing":
             return _FEATURE_STORE.load_errors.get(
                 geo, f"{geo} hardcoded feature vectors are not loaded"
             )
@@ -393,6 +610,16 @@ def health_check() -> dict:
     tabular_required = {
         geo: _TABULAR_MODELS.required_features(geo) for geo in loaded_tabular_geos
     }
+    feature_alignment = {
+        geo: {
+            "expected_features": _TABULAR_MODELS.required_features(geo),
+            "available_hardcoded_features": _FEATURE_STORE.feature_count.get(geo),
+            "model_feature_names_available": _TABULAR_MODELS.feature_names(geo)
+            is not None,
+            "vector_source": _vector_source_for_geo(geo),
+        }
+        for geo in loaded_tabular_geos
+    }
     readiness = {
         geo: {
             "ready": _geo_readiness_error(geo) is None,
@@ -403,7 +630,7 @@ def health_check() -> dict:
     return {
         "status": "healthy",
         "service": "ml-inference",
-        "mode": "model-only",
+        "mode": "model",
         "uk": {
             "model_dir": str(_UK_MODELS.model_dir),
             "loaded_horizons_h": sorted(_UK_MODELS.sessions.keys()),
@@ -411,11 +638,14 @@ def health_check() -> dict:
         },
         "tabular": {
             "loaded_geos": loaded_tabular_geos,
+            "loaded_model_paths": _TABULAR_MODELS.loaded_model_paths,
             "required_features": tabular_required,
+            "feature_alignment": feature_alignment,
             "load_errors": _TABULAR_MODELS.load_errors,
         },
         "hardcoded_feature_vectors": {
             "feature_dir": str(_FEATURE_STORE.feature_dir),
+            "synthetic_enabled": _FEATURE_STORE.synthetic_enabled,
             "loaded_geos": sorted(_FEATURE_STORE.vectors.keys()),
             "feature_count": _FEATURE_STORE.feature_count,
             "load_errors": _FEATURE_STORE.load_errors,
@@ -540,19 +770,12 @@ def predict_delta_series_post(payload: PredictSeriesInput) -> dict:
     geo_norm = _normalize_geo(payload.geo)
     if geo_norm not in SUPPORTED_GEOS:
         raise HTTPException(status_code=400, detail=f"Unsupported geo '{payload.geo}'")
+    _ensure_geo_ready(geo_norm)
 
     if payload.horizon_s < 60 or payload.horizon_s > 7 * 24 * 60 * 60:
         raise HTTPException(status_code=400, detail="horizon_s must be in [60, 604800]")
     if payload.freq_s < 60 or payload.freq_s > 6 * 60 * 60:
         raise HTTPException(status_code=400, detail="freq_s must be in [60, 21600]")
-
-    if _use_mock_mode_for_geo(geo_norm):
-        return predict_delta_series(
-            geo=geo_norm,
-            start=payload.start,
-            horizon_s=payload.horizon_s,
-            freq_s=payload.freq_s,
-        )
 
     if geo_norm == "UK":
         return predict_delta_series(

@@ -302,6 +302,13 @@ def _preview_text(text: str, limit: int = 200) -> str:
     return f"{snippet[:limit]}..."
 
 
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _extract_content_text(content: object) -> str | None:
     if isinstance(content, str):
         return content
@@ -745,20 +752,53 @@ def _dispatch_job_to_openshift(
     max_price_usd_hour: float | None,
     decision: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    name = _job_name(job_id)
+    auth_required = _env_flag("OPENSHIFT_AUTH_REQUIRED", default=False)
+
     try:
         from kubernetes import client as k8s_client
         from kubernetes import config as k8s_config
     except Exception as exc:
+        if not auth_required:
+            reason = f"kubernetes client unavailable: {exc}"
+            log.warning("dispatch deferred for job %s: %s", job_id, reason)
+            return {
+                "job_name": name,
+                "namespace": namespace,
+                "image": image,
+                "dispatched": False,
+                "mode": "planned",
+                "reason": reason,
+            }
         raise RuntimeError(
             "kubernetes package missing; add it to requirements.txt"
         ) from exc
 
+    auth_mode = ""
     try:
         k8s_config.load_incluster_config()
-    except Exception:
-        k8s_config.load_kube_config()
+        auth_mode = "incluster"
+    except Exception as incluster_exc:
+        try:
+            k8s_config.load_kube_config()
+            auth_mode = "kubeconfig"
+        except Exception as kubeconfig_exc:
+            reason = (
+                "unable to load kubernetes auth from incluster or kubeconfig; "
+                f"incluster_error={incluster_exc}; kubeconfig_error={kubeconfig_exc}"
+            )
+            if not auth_required:
+                log.warning("dispatch deferred for job %s: %s", job_id, reason)
+                return {
+                    "job_name": name,
+                    "namespace": namespace,
+                    "image": image,
+                    "dispatched": False,
+                    "mode": "planned",
+                    "reason": reason,
+                }
+            raise RuntimeError(reason) from kubeconfig_exc
 
-    name = _job_name(job_id)
     labels = {
         "app": "repo-training",
         "job-id": job_id,
@@ -828,7 +868,15 @@ def _dispatch_job_to_openshift(
         env=env_items,
         resources=k8s_client.V1ResourceRequirements(
             requests={"cpu": "250m", "memory": "512Mi"},
-            limits={"cpu": "2", "memory": "4Gi", "nvidia.com/gpu": analysis.gpu_count},
+            limits={
+                "cpu": "2",
+                "memory": "4Gi",
+                **(
+                    {"nvidia.com/gpu": analysis.gpu_count}
+                    if analysis.gpu_count > 0
+                    else {}
+                ),
+            },
         ),
     )
 
@@ -848,11 +896,30 @@ def _dispatch_job_to_openshift(
         spec=k8s_client.V1JobSpec(backoff_limit=0, template=template),
     )
 
-    api = k8s_client.BatchV1Api()
-    created = api.create_namespaced_job(namespace=namespace, body=job)
+    try:
+        api = k8s_client.BatchV1Api()
+        created = api.create_namespaced_job(namespace=namespace, body=job)
+    except Exception as exc:
+        reason = f"openshift job creation failed: {exc}"
+        if not auth_required:
+            log.warning("dispatch deferred for job %s: %s", job_id, reason)
+            return {
+                "job_name": name,
+                "namespace": namespace,
+                "image": image,
+                "dispatched": False,
+                "mode": "planned",
+                "reason": reason,
+            }
+        raise
+
     return {
         "job_name": created.metadata.name,
         "namespace": namespace,
+        "image": image,
+        "dispatched": True,
+        "mode": "openshift",
+        "auth_mode": auth_mode,
     }
 
 
@@ -1169,21 +1236,27 @@ def execute_prepared(self, payload: dict[str, Any]) -> dict[str, Any]:
         _update_job(inp.job_id, status="failed", error=str(exc))
         raise self.retry(exc=exc)
 
+    dispatched = bool(openshift_job.get("dispatched"))
+    status = "dispatched" if dispatched else "dispatch_planned"
+    dispatch_reason = str(openshift_job.get("reason") or "")
+
     _update_job(
         inp.job_id,
-        status="dispatched",
+        status=status,
         image=image,
         scheduling_decision=pre_dispatch_decision or {},
         openshift_job=openshift_job,
         confirmation_required=False,
-        dispatch_ready=False,
+        dispatch_ready=not dispatched,
+        dispatch_error=dispatch_reason,
     )
     return {
         "job_id": inp.job_id,
-        "status": "dispatched",
+        "status": status,
         "image": image,
         "scheduling_decision": pre_dispatch_decision or {},
         "openshift_job": openshift_job,
+        "dispatch_error": dispatch_reason,
     }
 
 
