@@ -30,6 +30,7 @@ htmlcov/
 # Node.js
 **/node_modules/
 **/package-lock.json
+!apps/webapp/package-lock.json
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -106,6 +107,7 @@ mlruns/
 session-*
 FLAT.xml
 **/package-lock.json
+!apps/webapp/package-lock.json
 .vscode/settings.json
 ml/fr/fr_merged.parquet
 ml/fin/fin_y_test_set.parquet
@@ -168,4 +170,3 @@ coverage/
 .nyc_output/
 test-results/
 *.coverage
-
