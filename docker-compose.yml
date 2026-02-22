@@ -31,6 +31,9 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
       - PYTHONPATH=/app
+      - SCHEDULING_MODE=${SCHEDULING_MODE:-prepared}
+      - RAILS_API_URL=${RAILS_API_URL:-http://rails:3001}
+      - OPENSHIFT_NAMESPACE=${OPENSHIFT_NAMESPACE:-drosel-ieu2022-dev}
     volumes:
       - ./.env:/app/.env
     depends_on:
