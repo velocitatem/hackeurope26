@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # App code layer
 COPY apps/backend/fastapi/ ./backend/
 COPY lib/ ./lib/
+COPY src/ ./src/
 
 EXPOSE 8000
 

@@ -110,7 +110,6 @@ def main() -> None:
                     reevaluated = scheduler.schedule(
                         job=job,
                         now_ts=epoch_now_ts,
-                        dispatch=False,
                     )
                     logger.info(
                         "Migration check epoch=%d current=%s/%s score=%.3f candidate=%s/%s score=%.3f delta=%.3f threshold=%.3f",

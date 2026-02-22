@@ -1,5 +1,5 @@
 from src.models import InventoryNode, JobSpec
-from src.scheduler import Scheduler
+from src.scheduler import NoEnergyWindowError, Scheduler
 
 
 def _series(start: int, step: int, deltas: list[float]) -> list[dict[str, float]]:
@@ -82,7 +82,6 @@ def test_schedule_picks_best_geo_gap_and_suggests_cheapest_node() -> None:
             allowed_geos=["FR", "DE"],
         ),
         now_ts=0,
-        dispatch=False,
     )
 
     assert inventory.calls[0]["geo"] == "DE"
@@ -112,8 +111,7 @@ def test_schedule_raises_when_no_positive_gap_exists() -> None:
                 allowed_geos=["FR"],
             ),
             now_ts=0,
-            dispatch=False,
         )
-        assert False, "Expected RuntimeError"
-    except RuntimeError as exc:
-        assert "No positive energy interval found" in str(exc)
+        assert False, "Expected NoEnergyWindowError"
+    except NoEnergyWindowError as exc:
+        assert "No positive energy window" in str(exc)

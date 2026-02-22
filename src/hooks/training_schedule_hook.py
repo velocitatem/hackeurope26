@@ -48,16 +48,7 @@ def main() -> int:
 
     try:
         job = _coerce_job_spec(payload)
-        try:
-            decision = scheduler.schedule(
-                job=job,
-                now_ts=float(now_ts),
-                dispatch=False,
-            )
-        except TypeError as exc:
-            if "dispatch" not in str(exc):
-                raise
-            decision = scheduler.schedule(job=job, now_ts=float(now_ts))
+        decision = scheduler.schedule(job=job, now_ts=float(now_ts))
     except Exception as exc:
         print(f"hook_error={exc}", file=sys.stderr)
         print("{}")

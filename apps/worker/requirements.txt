@@ -28,6 +28,7 @@ streamlit
 # AI / Agent SDK
 anthropic
 claude-agent-sdk
+kubernetes
 
 # ML (heavy - comment out if not needed)
 torch
