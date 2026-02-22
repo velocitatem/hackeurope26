@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Green Compute Platform - Pitch Deck</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --bg-dark: #050A08;
+      --bg-panel: #0A120E;
+      --accent-green: #00FF66;
+      --accent-glow: rgba(0, 255, 102, 0.25);
+    }
+    
+    body {
+      background-color: var(--bg-dark);
+      color: #F8FAFC;
+      font-family: 'Inter', sans-serif;
+      overflow: hidden; /* Prevent scrolling, act like a slide deck */
+    }
+
+    h1, h2, h3, .hero-number, .font-display {
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    /* Subtle radial gradient background */
+    body::before {
+      content: '';
+      position: absolute;
+      top: -50%; left: -50%; right: -50%; bottom: -50%;
+      background: radial-gradient(circle at center, var(--accent-glow) 0%, transparent 40%);
+      opacity: 0.4;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .slide {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 4rem;
+    }
+    #slide-3b {
+      padding: 1.5rem 2rem;
+      justify-content: flex-start;
+    }
+    #slide-2b {
+      padding: 2.5rem 4rem;
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      z-index: 10;
+    }
+
+    .content-wrapper {
+      width: 100%;
+      max-w: 1200px;
+      margin: 0 auto;
+      transform: translateY(20px);
+      transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .slide.active .content-wrapper {
+      transform: translateY(0);
+    }
+
+    .text-glow {
+      text-shadow: 0 0 24px var(--accent-glow);
+    }
+
+    .glass-panel {
+      background: rgba(10, 18, 14, 0.6);
+      border: 1px solid rgba(0, 255, 102, 0.15);
+      backdrop-filter: blur(12px);
+    }
+
+    /* Navigation dots */
+    .nav-dots {
+      position: absolute;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 0.75rem;
+      z-index: 50;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .dot.active {
+      background: var(--accent-green);
+      box-shadow: 0 0 10px var(--accent-green);
+      transform: scale(1.2);
+    }
+
+    /* Controls Hint */
+    .controls-hint {
+      position: absolute;
+      bottom: 2rem;
+      right: 2rem;
+      font-size: 0.75rem;
+      color: #64748B;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Slide 1: Hook -->
+  <div class="slide active" id="slide-1">
+    <div class="content-wrapper text-center max-w-5xl">
+      <h1 class="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-tight text-white mb-6">
+        AI training is <span class="text-slate-500 line-through decoration-red-500/70">wasteful</span><br>
+        and <span class="text-slate-500 line-through decoration-red-500/70">expensive</span>.
+      </h1>
+      <h2 class="text-4xl md:text-6xl font-display font-bold text-[#00FF66] text-glow mt-8">
+        We fix both.
+      </h2>
+    </div>
+  </div>
+
+  <!-- Slide 2: Problem -->
+  <div class="slide" id="slide-2">
+    <div class="content-wrapper max-w-4xl">
+      <h2 class="text-[#00FF66] font-display text-sm tracking-[0.2em] uppercase mb-4">The Problem</h2>
+      <h3 class="text-4xl md:text-5xl font-bold mb-12 text-white">The Status Quo is Broken</h3>
+      
+      <div class="space-y-6">
+        <div class="glass-panel p-6 rounded-2xl flex items-start gap-6 transform hover:scale-[1.02] transition-transform">
+          <div class="p-3 bg-red-500/10 rounded-lg text-red-400">
+            <i data-lucide="eye-off" class="w-8 h-8"></i>
+          </div>
+          <div>
+            <h4 class="text-2xl font-display font-semibold mb-2">GPU training is opaque</h4>
+            <p class="text-slate-400 text-lg">Developers lack visibility into the underlying energy source and real-time costs of their compute clusters.</p>
+          </div>
+        </div>
+
+        <div class="glass-panel p-6 rounded-2xl flex items-start gap-6 transform hover:scale-[1.02] transition-transform">
+          <div class="p-3 bg-orange-500/10 rounded-lg text-orange-400">
+            <i data-lucide="clock" class="w-8 h-8"></i>
+          </div>
+          <div>
+            <h4 class="text-2xl font-display font-semibold mb-2">It's an always-on paradigm</h4>
+            <p class="text-slate-400 text-lg">Jobs run immediately regardless of grid stress, punishing cost-sensitive users who can tolerate scheduling flexibility.</p>
+          </div>
+        </div>
+
+        <div class="glass-panel p-6 rounded-2xl flex items-start gap-6 transform hover:scale-[1.02] transition-transform">
+          <div class="p-3 bg-yellow-500/10 rounded-lg text-yellow-400">
+            <i data-lucide="zap-off" class="w-8 h-8"></i>
+          </div>
+          <div>
+            <h4 class="text-2xl font-display font-semibold mb-2">Ignores the energy grid</h4>
+            <p class="text-slate-400 text-lg">Massive compute loads run during peak fossil-fuel hours while gigawatts of clean energy are curtailed elsewhere.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Slide 2b: Live Scheduler Animation -->
+  <div class="slide" id="slide-2b">
+    <div class="content-wrapper max-w-5xl">
+      <h2 class="text-[#00FF66] font-display text-sm tracking-[0.2em] uppercase mb-2">How It Works — Live</h2>
+      <h3 class="text-3xl font-bold mb-6 text-white">Adaptive Energy-Surplus Routing</h3>
+      <div class="glass-panel rounded-2xl overflow-hidden" style="height: 520px; border: 1px solid rgba(0,255,102,0.2);">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 550" width="100%" height="100%" style="font-family: system-ui, -apple-system, sans-serif; background-color: transparent;">
+  
+  <defs>
+    <!-- Shadows -->
+    <filter id="shadow-sm" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.05" />
+    </filter>
+    <filter id="shadow-md" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.1" />
+    </filter>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Gradients for Energy Charts -->
+    <linearGradient id="energyGrad" x1="0" y1="0" x2="0" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="49%" stop-color="#10b981" />
+      <stop offset="51%" stop-color="#f59e0b" />
+    </linearGradient>
+    
+    <linearGradient id="energyGradFill" x1="0" y1="0" x2="0" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="49%" stop-color="#10b981" stop-opacity="0.2" />
+      <stop offset="51%" stop-color="#f59e0b" stop-opacity="0.2" />
+    </linearGradient>
+
+    <!-- ML Job Gradient -->
+    <linearGradient id="jobGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+
+    <!-- Clip Paths for Charts -->
+    <clipPath id="chart-clip">
+      <rect x="0" y="0" width="200" height="120" rx="4" />
+    </clipPath>
+
+    <!-- Reusable Chart Grid -->
+    <g id="chart-grid">
+      <!-- Forecast Area Background -->
+      <rect x="50" y="0" width="150" height="120" fill="#0f2018" opacity="0.5" />
+      <!-- Zero Line -->
+      <line x1="0" y1="60" x2="200" y2="60" stroke="#1e3a2f" stroke-width="1.5" stroke-dasharray="4 4" />
+      <!-- NOW Line -->
+      <line x1="50" y1="0" x2="50" y2="120" stroke="#00FF66" stroke-width="2" stroke-dasharray="3 3" />
+      <text x="50" y="15" fill="#00FF66" font-size="10" font-weight="bold" text-anchor="middle" letter-spacing="1">NOW</text>
+      <!-- Axis Labels -->
+      <text x="10" y="25" fill="#10b981" font-size="12" font-weight="bold">+</text>
+      <text x="10" y="105" fill="#f59e0b" font-size="14" font-weight="bold">-</text>
+    </g>
+
+    <!-- Data Center Rack Icon -->
+    <g id="rack-icon">
+      <rect x="0" y="0" width="40" height="50" rx="3" fill="#1a2e22" stroke="#2d5a40" stroke-width="1.5" />
+      <rect x="5" y="5" width="30" height="10" rx="1.5" fill="#0c1f16" stroke="#2d5a40" />
+      <circle cx="12" cy="10" r="2" fill="#10b981">
+        <animate attributeName="opacity" values="1;0.2;1" dur="1.5s" repeatCount="indefinite" />
+      </circle>
+      <rect x="5" y="20" width="30" height="10" rx="1.5" fill="#0c1f16" stroke="#2d5a40" />
+      <circle cx="12" cy="25" r="2" fill="#10b981">
+        <animate attributeName="opacity" values="1;0.2;1" dur="2s" repeatCount="indefinite" />
+      </circle>
+      <rect x="5" y="35" width="30" height="10" rx="1.5" fill="#0c1f16" stroke="#2d5a40" />
+      <circle cx="12" cy="40" r="2" fill="#10b981">
+        <animate attributeName="opacity" values="1;0.2;1" dur="1s" repeatCount="indefinite" />
+      </circle>
+    </g>
+  </defs>
+
+  <!-- ================= BACKGROUND & HEADER ================= -->
+  <rect width="100%" height="100%" fill="transparent" />
+  
+  <text x="400" y="35" fill="#00FF66" font-size="20" font-weight="800" text-anchor="middle" letter-spacing="-0.5">Energy-Surplus–Aware Adaptive Scheduler</text>
+  <text x="400" y="55" fill="#6b9e7e" font-size="13" font-weight="500" text-anchor="middle">Dynamic ML placement &amp; seamless migration based on delta(t) = production(t) − demand(t)</text>
+
+  <!-- ================= CHARTS SECTION (TOP) ================= -->
+  
+  <!-- Chart 1: France (FR) -->
+  <g transform="translate(50, 80)">
+    <rect width="200" height="120" rx="6" fill="#0c1f16" stroke="#1e3a2f" stroke-width="1.5" filter="url(#shadow-sm)" />
+    <text x="100" y="-8" fill="#94d4a8" font-size="12" font-weight="bold" text-anchor="middle">eu-west (FR) Delta Forecast</text>
+    
+    <g clip-path="url(#chart-clip)">
+      <use href="#chart-grid" />
+      <g>
+        <animateTransform attributeName="transform" type="translate" values="0,0; -300,0" dur="10s" repeatCount="indefinite" />
+        <!-- FR Area Path (Surplus drops to Deficit at x=150) -->
+        <path d="M 0,60 L 0,20 L 100,20 C 130,20 150,100 180,100 L 270,100 C 285,100 295,20 300,20 L 400,20 C 430,20 450,100 480,100 L 570,100 C 585,100 595,20 600,20 L 600,60 Z" fill="url(#energyGradFill)" />
+        <!-- FR Line Path -->
+        <path d="M 0,20 L 100,20 C 130,20 150,100 180,100 L 270,100 C 285,100 295,20 300,20 L 400,20 C 430,20 450,100 480,100 L 570,100 C 585,100 595,20 600,20" fill="none" stroke="url(#energyGrad)" stroke-width="3" />
+      </g>
+    </g>
+  </g>
+
+  <!-- Chart 2: Germany (DE) -->
+  <g transform="translate(300, 80)">
+    <rect width="200" height="120" rx="6" fill="#0c1f16" stroke="#1e3a2f" stroke-width="1.5" filter="url(#shadow-sm)" />
+    <text x="100" y="-8" fill="#94d4a8" font-size="12" font-weight="bold" text-anchor="middle">eu-central (DE) Delta Forecast</text>
+    
+    <g clip-path="url(#chart-clip)">
+      <use href="#chart-grid" />
+      <g>
+        <animateTransform attributeName="transform" type="translate" values="0,0; -300,0" dur="10s" repeatCount="indefinite" />
+        <!-- DE Area Path (Deficit rises to Surplus at x=150) -->
+        <path d="M 0,60 L 0,100 L 100,100 C 130,100 150,20 180,20 L 270,20 C 285,20 295,100 300,100 L 400,100 C 430,100 450,20 480,20 L 570,20 C 585,20 595,100 600,100 L 600,60 Z" fill="url(#energyGradFill)" />
+        <!-- DE Line Path -->
+        <path d="M 0,100 L 100,100 C 130,100 150,20 180,20 L 270,20 C 285,20 295,100 300,100 L 400,100 C 430,100 450,20 480,20 L 570,20 C 585,20 595,100 600,100" fill="none" stroke="url(#energyGrad)" stroke-width="3" />
+      </g>
+    </g>
+  </g>
+
+  <!-- Chart 3: Spain (ES) -->
+  <g transform="translate(550, 80)">
+    <rect width="200" height="120" rx="6" fill="#0c1f16" stroke="#1e3a2f" stroke-width="1.5" filter="url(#shadow-sm)" />
+    <text x="100" y="-8" fill="#94d4a8" font-size="12" font-weight="bold" text-anchor="middle">eu-south (ES) Delta Forecast</text>
+    
+    <g clip-path="url(#chart-clip)">
+      <use href="#chart-grid" />
+      <g>
+        <animateTransform attributeName="transform" type="translate" values="0,0; -300,0" dur="10s" repeatCount="indefinite" />
+        <!-- ES Area Path (Stays relatively flat/low) -->
+        <path d="M 0,60 L 0,80 Q 75,100 150,80 Q 225,60 300,80 Q 375,100 450,80 Q 525,60 600,80 L 600,60 Z" fill="url(#energyGradFill)" />
+        <path d="M 0,80 Q 75,100 150,80 Q 225,60 300,80 Q 375,100 450,80 Q 525,60 600,80" fill="none" stroke="url(#energyGrad)" stroke-width="3" />
+      </g>
+    </g>
+  </g>
+
+
+  <!-- ================= INFRASTRUCTURE / DATA CENTERS (BOTTOM) ================= -->
+  
+  <!-- Global Network Line Connecting DCs -->
+  <line x1="150" y1="360" x2="650" y2="360" stroke="#1e3a2f" stroke-width="3" stroke-dasharray="6 6" />
+  
+  <!-- Migration Activity Path (Hidden by default, shows during migration) -->
+  <g>
+    <animate attributeName="opacity" values="0; 0; 1; 0; 0" keyTimes="0; 0.35; 0.4; 0.45; 1" dur="10s" repeatCount="indefinite" />
+    <line x1="150" y1="360" x2="400" y2="360" stroke="#6366f1" stroke-width="4" stroke-dasharray="8 8">
+      <animate attributeName="stroke-dashoffset" from="16" to="0" dur="0.4s" repeatCount="indefinite" />
+    </line>
+    <!-- Little data packets -->
+    <circle cx="200" cy="360" r="4" fill="#6366f1" filter="url(#glow)">
+      <animate attributeName="cx" values="150;400" dur="1s" repeatCount="indefinite" />
+    </circle>
+  </g>
+
+  <!-- FR Data Center -->
+  <g transform="translate(60, 310)">
+    <rect width="180" height="100" rx="8" fill="#0c1f16" stroke="#1e3a2f" stroke-width="2" filter="url(#shadow-md)" />
+    <!-- Status Indicator Outline (Green when active) -->
+    <rect width="180" height="100" rx="8" fill="none" stroke="#10b981" stroke-width="3">
+      <animate attributeName="opacity" values="1; 1; 0; 0; 1" keyTimes="0; 0.35; 0.4; 0.95; 1" dur="10s" repeatCount="indefinite" />
+    </rect>
+    <text x="90" y="25" fill="#e2f0e8" font-size="14" font-weight="bold" text-anchor="middle">Region: eu-west</text>
+    <text x="90" y="42" fill="#6b9e7e" font-size="11" text-anchor="middle">Hardware: 8x A100</text>
+    <use href="#rack-icon" x="40" y="45" />
+    <use href="#rack-icon" x="100" y="45" />
+  </g>
+
+  <!-- DE Data Center -->
+  <g transform="translate(310, 310)">
+    <rect width="180" height="100" rx="8" fill="#0c1f16" stroke="#1e3a2f" stroke-width="2" filter="url(#shadow-md)" />
+    
+    <!-- Warm-start Glow Box (Orange) -->
+    <rect width="180" height="100" rx="8" fill="none" stroke="#f59e0b" stroke-width="4">
+      <animate attributeName="opacity" values="0; 0; 1; 1; 0; 0; 0" keyTimes="0; 0.25; 0.28; 0.38; 0.4; 0.95; 1" dur="10s" repeatCount="indefinite" />
+    </rect>
+    
+    <!-- Active Glow Box (Green) -->
+    <rect width="180" height="100" rx="8" fill="none" stroke="#10b981" stroke-width="3">
+      <animate attributeName="opacity" values="0; 0; 1; 1; 0" keyTimes="0; 0.38; 0.4; 0.95; 1" dur="10s" repeatCount="indefinite" />
+    </rect>
+
+    <text x="90" y="25" fill="#e2f0e8" font-size="14" font-weight="bold" text-anchor="middle">Region: eu-central</text>
+    <text x="90" y="42" fill="#6b9e7e" font-size="11" text-anchor="middle">Hardware: 8x A100</text>
+    <use href="#rack-icon" x="40" y="45" />
+    <use href="#rack-icon" x="100" y="45" />
+
+    <!-- Warm-start overlay label -->
+    <g>
+      <animate attributeName="opacity" values="0; 0; 1; 1; 0; 0" keyTimes="0; 0.25; 0.28; 0.38; 0.4; 1" dur="10s" repeatCount="indefinite" />
+      <rect x="25" y="-15" width="130" height="24" rx="12" fill="#f59e0b" filter="url(#glow)" />
+      <text x="90" y="1" fill="#0c1f16" font-size="10" font-weight="bold" text-anchor="middle" letter-spacing="1">WARM-STARTING</text>
+    </g>
+  </g>
+
+  <!-- ES Data Center -->
+  <g transform="translate(560, 310)">
+    <rect width="180" height="100" rx="8" fill="#0c1f16" stroke="#1e3a2f" stroke-width="2" filter="url(#shadow-md)" />
+    <text x="90" y="25" fill="#e2f0e8" font-size="14" font-weight="bold" text-anchor="middle">Region: eu-south</text>
+    <text x="90" y="42" fill="#6b9e7e" font-size="11" text-anchor="middle">Hardware: Offline</text>
+    <use href="#rack-icon" x="40" y="45" opacity="0.4" />
+    <use href="#rack-icon" x="100" y="45" opacity="0.4" />
+  </g>
+
+
+  <!-- ================= THE ML JOB PAYLOAD ================= -->
+  
+  <g>
+    <!-- Master Translation Animation -->
+    <animateTransform attributeName="transform" type="translate" values="80,240; 80,240; 330,240; 330,240; 80,240" keyTimes="0; 0.35; 0.45; 0.95; 1" dur="10s" repeatCount="indefinite" />
+    
+    <!-- Master Opacity Animation to hide the "snap back" -->
+    <animate attributeName="opacity" values="1; 1; 0; 0; 1" keyTimes="0; 0.94; 0.95; 0.99; 1" dur="10s" repeatCount="indefinite" />
+
+    <!-- Job Box -->
+    <rect width="140" height="60" rx="8" fill="url(#jobGrad)" filter="url(#shadow-md)" />
+    
+    <!-- State Label -->
+    <g transform="translate(70, -10)">
+      <rect x="-40" y="-12" width="80" height="20" rx="10" fill="#0c1f16" stroke="#6366f1" stroke-width="1.5" />
+      <text x="0" y="2" font-size="10" font-weight="bold" fill="#4f46e5" text-anchor="middle">
+        <tspan>
+          <animate attributeName="opacity" values="1;1;0;0;1" keyTimes="0;0.34;0.35;0.45;1" dur="10s" repeatCount="indefinite"/>
+          Running
+        </tspan>
+        <tspan x="0" y="2" opacity="0">
+          <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.34;0.35;0.45;1" dur="10s" repeatCount="indefinite"/>
+          Migrating...
+        </tspan>
+        <tspan x="0" y="2" opacity="0">
+          <animate attributeName="opacity" values="0;0;0;1;0" keyTimes="0;0.44;0.45;0.94;1" dur="10s" repeatCount="indefinite"/>
+          Running
+        </tspan>
+      </text>
+    </g>
+
+    <!-- GPU / Brain icon approximation -->
+    <rect x="10" y="10" width="24" height="24" rx="4" fill="#0c1f16" fill-opacity="0.2" />
+    <circle cx="22" cy="22" r="4" fill="#0c1f16" />
+    <path d="M 16 22 L 28 22 M 22 16 L 22 28" stroke="#ffffff" stroke-width="2" />
+
+    <!-- Job Details -->
+    <text x="42" y="20" fill="#0c1f16" font-size="11" font-weight="bold">Job: ResNet-101</text>
+    <text x="42" y="34" fill="#e0e7ff" font-size="9">Epoch Progress</text>
+    
+    <!-- Progress Bar inside Job Box -->
+    <rect x="10" y="44" width="120" height="6" rx="3" fill="#050A08" />
+    <rect x="10" y="44" width="0" height="6" rx="3" fill="#34d399">
+      <animate attributeName="width" values="10; 40; 45; 45; 110; 120; 10" keyTimes="0; 0.35; 0.4; 0.45; 0.94; 0.95; 1" dur="10s" repeatCount="indefinite" />
+    </rect>
+  </g>
+
+
+  <!-- ================= SYSTEM LOG / ACTION CONSOLE (BOTTOM) ================= -->
+  
+  <g transform="translate(50, 460)">
+    <!-- Console Background -->
+    <rect width="700" height="50" rx="8" fill="#0f2018" stroke="#1e3a2f" stroke-width="1.5" />
+    <!-- Little terminal dots -->
+    <circle cx="20" cy="25" r="4" fill="#10b981" />
+    
+    <!-- Log Line 1: Placement -->
+    <text x="35" y="29" fill="#e2f0e8" font-size="13" font-family="monospace">
+      <animate attributeName="opacity" values="1; 1; 0; 0" keyTimes="0; 0.25; 0.26; 1" dur="10s" repeatCount="indefinite" />
+      <tspan fill="#6b9e7e">[00:00]</tspan> <tspan fill="#00FF66">Placement Plan:</tspan> Assigned to FR due to sustained surplus delta(t).
+    </text>
+    
+    <!-- Log Line 2: Alert / Forecast Evaluation -->
+    <text x="35" y="29" fill="#e2f0e8" font-size="13" font-family="monospace" opacity="0">
+      <animate attributeName="opacity" values="0; 0; 1; 1; 0; 0" keyTimes="0; 0.25; 0.26; 0.34; 0.35; 1" dur="10s" repeatCount="indefinite" />
+      <tspan fill="#6b9e7e">[00:45]</tspan> <tspan fill="#f59e0b">Adaptive Alert:</tspan> FR surplus ending. DE surplus rising. Triggering Warm-start...
+    </text>
+    
+    <!-- Log Line 3: Migration -->
+    <text x="35" y="29" fill="#e2f0e8" font-size="13" font-family="monospace" opacity="0">
+      <animate attributeName="opacity" values="0; 0; 1; 1; 0; 0" keyTimes="0; 0.34; 0.35; 0.44; 0.45; 1" dur="10s" repeatCount="indefinite" />
+      <tspan fill="#6b9e7e">[01:00]</tspan> <tspan fill="#6366f1">Migration:</tspan> Checkpointing model state &amp; transferring to DE...
+    </text>
+
+    <!-- Log Line 4: Resumed -->
+    <text x="35" y="29" fill="#e2f0e8" font-size="13" font-family="monospace" opacity="0">
+      <animate attributeName="opacity" values="0; 0; 1; 1; 0" keyTimes="0; 0.44; 0.45; 0.98; 1" dur="10s" repeatCount="indefinite" />
+      <tspan fill="#6b9e7e">[01:15]</tspan> <tspan fill="#10b981">Resumed:</tspan> Training continues in DE. 100% green energy maintained.
+    </text>
+  </g>
+
+</svg>
+      </div>
+      <p class="text-slate-500 text-sm mt-3 text-center font-mono">
+        Live animation — job migrates between regions as energy surplus shifts across countries
+      </p>
+    </div>
+  </div>
+
+  <!-- Slide 3: Solution -->
+  <div class="slide" id="slide-3">
+    <div class="content-wrapper max-w-6xl">
+      <h2 class="text-[#00FF66] font-display text-sm tracking-[0.2em] uppercase mb-4">The Solution</h2>
+      <h3 class="text-4xl md:text-5xl font-bold mb-12 text-white">Intelligent, Carbon-Aware Routing</h3>
+      
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <!-- Step 1 -->
+        <div class="glass-panel p-8 rounded-2xl relative border-t-2 border-t-[#00FF66]">
+          <div class="absolute -top-4 left-6 bg-[#00FF66] text-black font-bold w-8 h-8 rounded-full flex items-center justify-center">1</div>
+          <i data-lucide="github" class="w-10 h-10 text-[#00FF66] mb-6 mt-2"></i>
+          <h4 class="text-xl font-bold mb-3">Submit</h4>
+          <p class="text-slate-400">Users submit a GitHub link + scheduling preferences (max wait time).</p>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="glass-panel p-8 rounded-2xl relative border-t-2 border-t-[#00FF66]">
+          <div class="absolute -top-4 left-6 bg-[#00FF66] text-black font-bold w-8 h-8 rounded-full flex items-center justify-center">2</div>
+          <i data-lucide="bar-chart-2" class="w-10 h-10 text-[#00FF66] mb-6 mt-2"></i>
+          <h4 class="text-xl font-bold mb-3">Forecast</h4>
+          <p class="text-slate-400">ML models forecast grid gaps across UK, France, Finland, and Italy.</p>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="glass-panel p-8 rounded-2xl relative border-t-2 border-t-[#00FF66]">
+          <div class="absolute -top-4 left-6 bg-[#00FF66] text-black font-bold w-8 h-8 rounded-full flex items-center justify-center">3</div>
+          <i data-lucide="git-merge" class="w-10 h-10 text-[#00FF66] mb-6 mt-2"></i>
+          <h4 class="text-xl font-bold mb-3">Route & Monitor</h4>
+          <p class="text-slate-400">Job routed to the cheapest green window with injected carbon monitoring.</p>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="glass-panel p-8 rounded-2xl relative border-t-2 border-t-[#00FF66]">
+          <div class="absolute -top-4 left-6 bg-[#00FF66] text-black font-bold w-8 h-8 rounded-full flex items-center justify-center">4</div>
+          <i data-lucide="cloud" class="w-10 h-10 text-[#00FF66] mb-6 mt-2"></i>
+          <h4 class="text-xl font-bold mb-3">Deploy</h4>
+          <p class="text-slate-400">Automatically deployed and executed via AWS, Azure, or GCP infrastructure.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Slide 3b: Architecture / Backend Diagram -->
+  <div class="slide" id="slide-3b">
+    <div class="content-wrapper max-w-full px-4" style="height:90vh; display:flex; flex-direction:column;">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h2 class="text-[#00FF66] font-display text-sm tracking-[0.2em] uppercase">Under the Hood</h2>
+          <h3 class="text-3xl font-bold text-white">Backend Architecture — 9-Step Flow</h3>
+        </div>
+        <div class="flex gap-4 text-xs text-slate-500 font-mono">
+          <span><span style="color:#00e5ff">■</span> USER/INFRA</span>
+          <span><span style="color:#fbbf24">■</span> REDIS QUEUES</span>
+          <span><span style="color:#a78bfa">■</span> CLAUDE CODE</span>
+          <span><span style="color:#00ff88">■</span> ML MODELS</span>
+          <span><span style="color:#ff6b35">■</span> CLOUD</span>
+        </div>
+      </div>
+      <div class="flex-1 glass-panel rounded-2xl overflow-hidden" style="min-height:0;">
+        <div style="width:100%; height:100%; overflow:auto; padding:8px;">
+          <svg class="main-diagram" viewBox="0 0 1300 860" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <!-- Arrowhead markers -->
+        <marker id="arr-cyan" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#00e5ff"/>
+        </marker>
+        <marker id="arr-yellow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#fbbf24"/>
+        </marker>
+        <marker id="arr-purple" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#a78bfa"/>
+        </marker>
+        <marker id="arr-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#00ff88"/>
+        </marker>
+        <marker id="arr-orange" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#ff6b35"/>
+        </marker>
+        <marker id="arr-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#4a9eff"/>
+        </marker>
+
+        <!-- Glows -->
+        <filter id="glow-cyan">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="glow-green">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+
+        <!-- Grid pattern -->
+        <pattern id="smallgrid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#0f1820" stroke-width="0.5"/>
+        </pattern>
+      </defs>
+
+      <!-- Background -->
+      <rect width="1300" height="860" fill="#080c0f" rx="6"/>
+      <rect width="1300" height="860" fill="url(#smallgrid)" rx="6"/>
+
+      <!-- ============================================================ -->
+      <!-- SECTION LABELS -->
+      <!-- ============================================================ -->
+
+      <!-- Layer labels on left side -->
+      <rect x="0" y="30" width="3" height="80" fill="#00e5ff" rx="1"/>
+      <text x="10" y="58" font-family="IBM Plex Mono" font-size="9" fill="#4a6070" letter-spacing="2">INPUT</text>
+      <text x="10" y="72" font-family="IBM Plex Mono" font-size="9" fill="#4a6070" letter-spacing="2">LAYER</text>
+
+      <rect x="0" y="160" width="3" height="80" fill="#fbbf24" rx="1"/>
+      <text x="10" y="188" font-family="IBM Plex Mono" font-size="9" fill="#4a6070" letter-spacing="2">JOB</text>
+      <text x="10" y="202" font-family="IBM Plex Mono" font-size="9" fill="#4a6070" letter-spacing="2">QUEUE</text>
+
+      <rect x="0" y="290" width="3" height="80" fill="#a78bfa" rx="1"/>
+      <text x="10" y="318" font-family="IBM Plex Mono" font-size="9" fill="#4a6070" letter-spacing="2">CODE</text>
+      <text x="10" y="332" font-family="IBM Plex Mono" font-size="9" fill="#4a6070" letter-spacing="2">LAYER</text>
+
+      <rect x="0" y="420" width="3" height="120" fill="#00ff88" rx="1"/>
+      <text x="10" y="448" font-family="IBM Plex Mono" font-size="9" fill="#4a6070" letter-spacing="2">ENERGY</text>
+      <text x="10" y="462" font-family="IBM Plex Mono" font-size="9" fill="#4a6070" letter-spacing="2">FORECAST</text>
+
+      <rect x="0" y="590" width="3" height="80" fill="#ff6b35" rx="1"/>
+      <text x="10" y="618" font-family="IBM Plex Mono" font-size="9" fill="#4a6070" letter-spacing="2">DEPLOY</text>
+      <text x="10" y="632" font-family="IBM Plex Mono" font-size="9" fill="#4a6070" letter-spacing="2">LAYER</text>
+
+      <rect x="0" y="720" width="3" height="80" fill="#00e5ff" rx="1"/>
+      <text x="10" y="748" font-family="IBM Plex Mono" font-size="9" fill="#4a6070" letter-spacing="2">METRICS</text>
+      <text x="10" y="762" font-family="IBM Plex Mono" font-size="9" fill="#4a6070" letter-spacing="2">LAYER</text>
+
+      <!-- ============================================================ -->
+      <!-- ROW 1: USER INPUT -->
+      <!-- ============================================================ -->
+
+      <!-- USER NODE -->
+      <g id="node-user" class="node-group" transform="translate(50, 30)"
+         data-tip="User submits: GitHub repo link, compute preferences (slow/fast, spot/future), and allowed training countries.">
+        <rect width="160" height="110" rx="4" fill="#0c1419" stroke="#00e5ff" stroke-width="1"/>
+        <rect x="0" y="-1" width="80" height="14" rx="2" fill="rgba(0,229,255,0.12)" stroke="rgba(0,229,255,0.3)" stroke-width="0.5"/>
+        <text x="8" y="10" font-family="IBM Plex Mono" font-size="8" fill="#00e5ff" letter-spacing="1">USER</text>
+        <text x="20" y="40" font-size="22">👤</text>
+        <text x="20" y="65" font-family="IBM Plex Mono" font-size="10" fill="#00e5ff" font-weight="600" letter-spacing="1">DEVELOPER</text>
+        <text x="20" y="80" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">GitHub link</text>
+        <text x="20" y="92" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Compute prefs</text>
+        <text x="20" y="104" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Country allow-list</text>
+      </g>
+
+      <!-- ARROW 1: User → Redis Q1 -->
+      <g>
+        <line x1="212" y1="85" x2="285" y2="85" stroke="#00e5ff" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arr-cyan)">
+          <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1.2s" repeatCount="indefinite"/>
+        </line>
+        <text x="240" y="78" class="step-badge" font-family="IBM Plex Mono" font-size="8" fill="#4a6070" text-anchor="middle">submit job</text>
+        <circle cx="219" cy="85" r="7" fill="#0c1419" stroke="#00e5ff" stroke-width="1"/>
+        <text x="219" y="89" font-family="IBM Plex Mono" font-size="7" fill="#00e5ff" text-anchor="middle" font-weight="600">1</text>
+      </g>
+
+      <!-- REDIS Q1 NODE -->
+      <g id="node-redis1" transform="translate(285, 30)">
+        <rect width="155" height="110" rx="4" fill="#0c1419" stroke="#fbbf24" stroke-width="1"/>
+        <rect x="0" y="-1" width="100" height="14" rx="2" fill="rgba(251,191,36,0.12)" stroke="rgba(251,191,36,0.3)" stroke-width="0.5"/>
+        <text x="8" y="10" font-family="IBM Plex Mono" font-size="8" fill="#fbbf24" letter-spacing="1">JOB QUEUE</text>
+        <text x="20" y="40" font-size="22">⚡</text>
+        <text x="20" y="65" font-family="IBM Plex Mono" font-size="10" fill="#fbbf24" font-weight="600" letter-spacing="1">REDIS Q-1</text>
+        <text x="20" y="80" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Job enqueue</text>
+        <text x="20" y="92" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Priority ordering</text>
+        <text x="20" y="104" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Deduplication</text>
+      </g>
+
+      <!-- ARROW 2: Redis Q1 → Claude Code -->
+      <g>
+        <line x1="442" y1="85" x2="515" y2="85" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arr-yellow)">
+          <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1.4s" repeatCount="indefinite"/>
+        </line>
+        <text x="478" y="78" class="step-badge" font-family="IBM Plex Mono" font-size="8" fill="#4a6070" text-anchor="middle">trigger</text>
+        <circle cx="449" cy="85" r="7" fill="#0c1419" stroke="#fbbf24" stroke-width="1"/>
+        <text x="449" y="89" font-family="IBM Plex Mono" font-size="7" fill="#fbbf24" text-anchor="middle" font-weight="600">2</text>
+      </g>
+
+      <!-- CLAUDE CODE NODE -->
+      <g id="node-claude" transform="translate(515, 30)">
+        <rect width="165" height="110" rx="4" fill="#0c1419" stroke="#a78bfa" stroke-width="1"/>
+        <rect x="0" y="-1" width="120" height="14" rx="2" fill="rgba(167,139,250,0.12)" stroke="rgba(167,139,250,0.3)" stroke-width="0.5"/>
+        <text x="8" y="10" font-family="IBM Plex Mono" font-size="8" fill="#a78bfa" letter-spacing="1">AI CODE AGENT</text>
+        <text x="20" y="40" font-size="22">🤖</text>
+        <text x="20" y="65" font-family="IBM Plex Mono" font-size="10" fill="#a78bfa" font-weight="600" letter-spacing="1">CLAUDE CODE</text>
+        <text x="20" y="80" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Restructure code</text>
+        <text x="20" y="92" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Inject carbon hooks</text>
+        <text x="20" y="104" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Estimate runtime</text>
+      </g>
+
+      <!-- ============================================================ -->
+      <!-- ROW 2: REDIS Q2 + RAILWAY TRIGGER -->
+      <!-- ============================================================ -->
+
+      <!-- ARROW 3: Claude Code → Redis Q2 (down) -->
+      <g>
+        <line x1="597" y1="142" x2="597" y2="195" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arr-purple)">
+          <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1.3s" repeatCount="indefinite"/>
+        </line>
+        <circle cx="597" cy="148" r="7" fill="#0c1419" stroke="#a78bfa" stroke-width="1"/>
+        <text x="597" y="152" font-family="IBM Plex Mono" font-size="7" fill="#a78bfa" text-anchor="middle" font-weight="600">3</text>
+        <text x="608" y="172" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">enriched job</text>
+      </g>
+
+      <!-- REDIS Q2 NODE -->
+      <g id="node-redis2" transform="translate(515, 195)">
+        <rect width="165" height="110" rx="4" fill="#0c1419" stroke="#fbbf24" stroke-width="1"/>
+        <rect x="0" y="-1" width="100" height="14" rx="2" fill="rgba(251,191,36,0.12)" stroke="rgba(251,191,36,0.3)" stroke-width="0.5"/>
+        <text x="8" y="10" font-family="IBM Plex Mono" font-size="8" fill="#fbbf24" letter-spacing="1">JOB QUEUE</text>
+        <text x="20" y="40" font-size="22">⚡</text>
+        <text x="20" y="65" font-family="IBM Plex Mono" font-size="10" fill="#fbbf24" font-weight="600" letter-spacing="1">REDIS Q-2</text>
+        <text x="20" y="80" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Enriched job payload</text>
+        <text x="20" y="92" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">User prefs attached</text>
+        <text x="20" y="104" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Country filters</text>
+      </g>
+
+      <!-- ARROW 4: Redis Q2 → Railway -->
+      <g>
+        <line x1="682" y1="250" x2="755" y2="250" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arr-yellow)">
+          <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1.4s" repeatCount="indefinite"/>
+        </line>
+        <circle cx="689" cy="250" r="7" fill="#0c1419" stroke="#fbbf24" stroke-width="1"/>
+        <text x="689" y="254" font-family="IBM Plex Mono" font-size="7" fill="#fbbf24" text-anchor="middle" font-weight="600">4</text>
+        <text x="718" y="243" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">dispatch</text>
+      </g>
+
+      <!-- RAILWAY NODE -->
+      <g id="node-railway" transform="translate(755, 195)">
+        <rect width="165" height="110" rx="4" fill="#0c1419" stroke="#00e5ff" stroke-width="1.5"/>
+        <rect x="0" y="-1" width="80" height="14" rx="2" fill="rgba(0,229,255,0.12)" stroke="rgba(0,229,255,0.3)" stroke-width="0.5"/>
+        <text x="8" y="10" font-family="IBM Plex Mono" font-size="8" fill="#00e5ff" letter-spacing="1">INFRA</text>
+        <text x="20" y="40" font-size="22">🚂</text>
+        <text x="20" y="65" font-family="IBM Plex Mono" font-size="10" fill="#00e5ff" font-weight="600" letter-spacing="1">RAILWAY</text>
+        <text x="20" y="80" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Trigger ML models</text>
+        <text x="20" y="92" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Orchestrate runs</text>
+        <text x="20" y="104" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Route by country</text>
+      </g>
+
+      <!-- ============================================================ -->
+      <!-- ROW 3: ML MODELS (4 countries) -->
+      <!-- ============================================================ -->
+
+      <!-- ARROW 5: Railway → ML Models (down) -->
+      <g>
+        <line x1="837" y1="307" x2="837" y2="370" stroke="#00e5ff" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arr-cyan)">
+          <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1.2s" repeatCount="indefinite"/>
+        </line>
+        <circle cx="837" cy="313" r="7" fill="#0c1419" stroke="#00e5ff" stroke-width="1"/>
+        <text x="837" y="317" font-family="IBM Plex Mono" font-size="7" fill="#00e5ff" text-anchor="middle" font-weight="600">5</text>
+        <text x="848" y="342" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">invoke models</text>
+      </g>
+
+      <!-- ML MODELS PANEL -->
+      <g>
+        <!-- Container box -->
+        <rect x="50" y="370" width="940" height="140" rx="4" fill="#0a1218" stroke="#00ff88" stroke-width="1" stroke-dasharray="4 3"/>
+        <text x="66" y="358" font-family="IBM Plex Mono" font-size="8" fill="#00ff88" letter-spacing="2">ENERGY GAP FORECASTING MODELS — RAILWAY HOSTED</text>
+
+        <!-- UK Model -->
+        <rect x="70" y="390" width="190" height="100" rx="3" fill="#0c1419" stroke="#00ff88" stroke-width="1"/>
+        <text x="90" y="378" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" letter-spacing="1">MODEL</text>
+        <text x="90" y="420" font-size="18">🇬🇧</text>
+        <text x="90" y="445" font-family="IBM Plex Mono" font-size="9" fill="#00ff88" font-weight="600">UK MODEL</text>
+        <text x="90" y="460" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">12h horizon</text>
+        <text x="90" y="474" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Gap forecast (MW)</text>
+
+        <!-- France Model -->
+        <rect x="285" y="390" width="190" height="100" rx="3" fill="#0c1419" stroke="#00ff88" stroke-width="1"/>
+        <text x="305" y="378" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" letter-spacing="1">MODEL</text>
+        <text x="305" y="420" font-size="18">🇫🇷</text>
+        <text x="305" y="445" font-family="IBM Plex Mono" font-size="9" fill="#00ff88" font-weight="600">FRANCE MODEL</text>
+        <text x="305" y="460" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">12h horizon</text>
+        <text x="305" y="474" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Gap forecast (MW)</text>
+
+        <!-- Finland Model -->
+        <rect x="500" y="390" width="190" height="100" rx="3" fill="#0c1419" stroke="#00ff88" stroke-width="1"/>
+        <text x="520" y="378" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" letter-spacing="1">MODEL</text>
+        <text x="520" y="420" font-size="18">🇫🇮</text>
+        <text x="520" y="445" font-family="IBM Plex Mono" font-size="9" fill="#00ff88" font-weight="600">FINLAND MODEL</text>
+        <text x="520" y="460" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">12h horizon</text>
+        <text x="520" y="474" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Gap forecast (MW)</text>
+
+        <!-- Italy Model -->
+        <rect x="715" y="390" width="190" height="100" rx="3" fill="#0c1419" stroke="#00ff88" stroke-width="1"/>
+        <text x="735" y="378" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" letter-spacing="1">MODEL</text>
+        <text x="735" y="420" font-size="18">🇮🇹</text>
+        <text x="735" y="445" font-family="IBM Plex Mono" font-size="9" fill="#00ff88" font-weight="600">ITALY MODEL</text>
+        <text x="735" y="460" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">12h horizon</text>
+        <text x="735" y="474" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Gap forecast (MW)</text>
+      </g>
+
+      <!-- DB Nodes alongside ML models -->
+      <!-- Energy DB -->
+      <g id="node-energy-db" transform="translate(1020, 370)">
+        <rect width="145" height="65" rx="3" fill="#0c1419" stroke="#4a9eff" stroke-width="1"/>
+        <rect x="0" y="-1" width="100" height="14" rx="2" fill="rgba(74,158,255,0.12)" stroke="rgba(74,158,255,0.3)" stroke-width="0.5"/>
+        <text x="8" y="10" font-family="IBM Plex Mono" font-size="8" fill="#4a9eff" letter-spacing="1">DATABASE</text>
+        <text x="14" y="35" font-size="14">🗄️</text>
+        <text x="36" y="35" font-family="IBM Plex Mono" font-size="9" fill="#4a9eff" font-weight="600">ENERGY DB</text>
+        <text x="14" y="52" font-family="IBM Plex Mono" font-size="7" fill="#4a6070">ENTSO-E historical</text>
+        <text x="14" y="62" font-family="IBM Plex Mono" font-size="7" fill="#4a6070">generation data</text>
+      </g>
+
+      <!-- Weather DB -->
+      <g id="node-weather-db" transform="translate(1020, 455)">
+        <rect width="145" height="65" rx="3" fill="#0c1419" stroke="#4a9eff" stroke-width="1"/>
+        <rect x="0" y="-1" width="100" height="14" rx="2" fill="rgba(74,158,255,0.12)" stroke="rgba(74,158,255,0.3)" stroke-width="0.5"/>
+        <text x="8" y="10" font-family="IBM Plex Mono" font-size="8" fill="#4a9eff" letter-spacing="1">DATABASE</text>
+        <text x="14" y="35" font-size="14">🌤️</text>
+        <text x="36" y="35" font-family="IBM Plex Mono" font-size="9" fill="#4a9eff" font-weight="600">WEATHER DB</text>
+        <text x="14" y="52" font-family="IBM Plex Mono" font-size="7" fill="#4a6070">Open-Meteo API</text>
+        <text x="14" y="62" font-family="IBM Plex Mono" font-size="7" fill="#4a6070">wind, temp, cloud</text>
+      </g>
+
+      <!-- DB arrows to ML panel -->
+      <line x1="1018" y1="402" x2="993" y2="430" stroke="#4a9eff" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arr-blue)"/>
+      <line x1="1018" y1="487" x2="993" y2="460" stroke="#4a9eff" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arr-blue)"/>
+
+      <!-- ============================================================ -->
+      <!-- ROW 4: HARDWARE ESTIMATION + DOCKERIZE -->
+      <!-- ============================================================ -->
+
+      <!-- ARROW 6: ML Models → Hardware Estimator -->
+      <g>
+        <line x1="480" y1="510" x2="480" y2="565" stroke="#00ff88" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arr-green)">
+          <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1.5s" repeatCount="indefinite"/>
+        </line>
+        <circle cx="480" cy="516" r="7" fill="#0c1419" stroke="#00ff88" stroke-width="1"/>
+        <text x="480" y="520" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" text-anchor="middle" font-weight="600">6</text>
+        <text x="490" y="545" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">gap + runtime est.</text>
+      </g>
+
+      <!-- HARDWARE ESTIMATOR NODE -->
+      <g id="node-hw" transform="translate(340, 565)">
+        <rect width="200" height="110" rx="4" fill="#0c1419" stroke="#a78bfa" stroke-width="1"/>
+        <rect x="0" y="-1" width="150" height="14" rx="2" fill="rgba(167,139,250,0.12)" stroke="rgba(167,139,250,0.3)" stroke-width="0.5"/>
+        <text x="8" y="10" font-family="IBM Plex Mono" font-size="8" fill="#a78bfa" letter-spacing="1">CLAUDE CODE — ESTIMATOR</text>
+        <text x="20" y="40" font-size="22">🧠</text>
+        <text x="20" y="65" font-family="IBM Plex Mono" font-size="10" fill="#a78bfa" font-weight="600" letter-spacing="1">HW SELECTOR</text>
+        <text x="20" y="80" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Runtime estimate</text>
+        <text x="20" y="92" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">GPU/CPU selection</text>
+        <text x="20" y="104" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Spot vs reserved</text>
+      </g>
+
+      <!-- ARROW 7: HW → Dockerize -->
+      <g>
+        <line x1="542" y1="620" x2="615" y2="620" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arr-purple)">
+          <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1.4s" repeatCount="indefinite"/>
+        </line>
+        <circle cx="549" cy="620" r="7" fill="#0c1419" stroke="#a78bfa" stroke-width="1"/>
+        <text x="549" y="624" font-family="IBM Plex Mono" font-size="7" fill="#a78bfa" text-anchor="middle" font-weight="600">7</text>
+        <text x="574" y="613" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">package</text>
+      </g>
+
+      <!-- DOCKERIZE NODE -->
+      <g id="node-docker" transform="translate(615, 565)">
+        <rect width="160" height="110" rx="4" fill="#0c1419" stroke="#00e5ff" stroke-width="1"/>
+        <rect x="0" y="-1" width="80" height="14" rx="2" fill="rgba(0,229,255,0.12)" stroke="rgba(0,229,255,0.3)" stroke-width="0.5"/>
+        <text x="8" y="10" font-family="IBM Plex Mono" font-size="8" fill="#00e5ff" letter-spacing="1">BUILD</text>
+        <text x="20" y="40" font-size="22">🐳</text>
+        <text x="20" y="65" font-family="IBM Plex Mono" font-size="10" fill="#00e5ff" font-weight="600" letter-spacing="1">DOCKERIZE</text>
+        <text x="20" y="80" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Build container</text>
+        <text x="20" y="92" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">Carbon code bundled</text>
+        <text x="20" y="104" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">HW config embedded</text>
+      </g>
+
+      <!-- ============================================================ -->
+      <!-- ROW 5: CLOUD DEPLOYMENT -->
+      <!-- ============================================================ -->
+
+      <!-- ARROW 8: Docker → Cloud -->
+      <g>
+        <line x1="695" y1="677" x2="695" y2="720" stroke="#00e5ff" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arr-cyan)">
+          <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1.2s" repeatCount="indefinite"/>
+        </line>
+        <circle cx="695" cy="683" r="7" fill="#0c1419" stroke="#00e5ff" stroke-width="1"/>
+        <text x="695" y="687" font-family="IBM Plex Mono" font-size="7" fill="#00e5ff" text-anchor="middle" font-weight="600">8</text>
+        <text x="706" y="705" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">deploy to</text>
+      </g>
+
+      <!-- CLOUD NODES -->
+      <!-- Azure -->
+      <g id="node-azure" transform="translate(430, 720)">
+        <rect width="130" height="90" rx="4" fill="#0c1419" stroke="#ff6b35" stroke-width="1"/>
+        <rect x="0" y="-1" width="80" height="14" rx="2" fill="rgba(255,107,53,0.12)" stroke="rgba(255,107,53,0.3)" stroke-width="0.5"/>
+        <text x="8" y="10" font-family="IBM Plex Mono" font-size="8" fill="#ff6b35" letter-spacing="1">CLOUD</text>
+        <text x="18" y="38" font-size="18">☁️</text>
+        <text x="18" y="60" font-family="IBM Plex Mono" font-size="9" fill="#ff6b35" font-weight="600">AZURE</text>
+        <text x="18" y="75" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">AKS / Spot VMs</text>
+        <text x="18" y="87" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">EU regions</text>
+      </g>
+
+      <!-- AWS -->
+      <g id="node-aws" transform="translate(595, 720)">
+        <rect width="130" height="90" rx="4" fill="#0c1419" stroke="#ff6b35" stroke-width="1"/>
+        <rect x="0" y="-1" width="80" height="14" rx="2" fill="rgba(255,107,53,0.12)" stroke="rgba(255,107,53,0.3)" stroke-width="0.5"/>
+        <text x="8" y="10" font-family="IBM Plex Mono" font-size="8" fill="#ff6b35" letter-spacing="1">CLOUD</text>
+        <text x="18" y="38" font-size="18">🟠</text>
+        <text x="18" y="60" font-family="IBM Plex Mono" font-size="9" fill="#ff6b35" font-weight="600">AWS</text>
+        <text x="18" y="75" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">EKS / Spot Fleet</text>
+        <text x="18" y="87" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">EU regions</text>
+      </g>
+
+      <!-- GCP -->
+      <g id="node-gcp" transform="translate(760, 720)">
+        <rect width="130" height="90" rx="4" fill="#0c1419" stroke="#ff6b35" stroke-width="1"/>
+        <rect x="0" y="-1" width="80" height="14" rx="2" fill="rgba(255,107,53,0.12)" stroke="rgba(255,107,53,0.3)" stroke-width="0.5"/>
+        <text x="8" y="10" font-family="IBM Plex Mono" font-size="8" fill="#ff6b35" letter-spacing="1">CLOUD</text>
+        <text x="18" y="38" font-size="18">🔵</text>
+        <text x="18" y="60" font-family="IBM Plex Mono" font-size="9" fill="#ff6b35" font-weight="600">GCP</text>
+        <text x="18" y="75" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">GKE / Preemptible</text>
+        <text x="18" y="87" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">EU regions</text>
+      </g>
+
+      <!-- OR labels between clouds -->
+      <text x="574" y="770" font-family="IBM Plex Mono" font-size="9" fill="#4a6070" text-anchor="middle">— OR —</text>
+      <text x="744" y="770" font-family="IBM Plex Mono" font-size="9" fill="#4a6070" text-anchor="middle">— OR —</text>
+
+      <!-- ============================================================ -->
+      <!-- ROW 6: METRICS / CARBON OUTPUT -->
+      <!-- ============================================================ -->
+
+      <!-- ARROW 9: Cloud → Metrics (feedback loop) -->
+      <g>
+        <line x1="595" y1="812" x2="595" y2="835" stroke="#00ff88" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#arr-green)">
+          <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1.2s" repeatCount="indefinite"/>
+        </line>
+        <circle cx="595" cy="818" r="7" fill="#0c1419" stroke="#00ff88" stroke-width="1"/>
+        <text x="595" y="822" font-family="IBM Plex Mono" font-size="7" fill="#00ff88" text-anchor="middle" font-weight="600">9</text>
+      </g>
+
+      <!-- METRICS NODE -->
+      <g transform="translate(370, 835)">
+        <rect width="450" height="22" rx="3" fill="#0c1419" stroke="#00ff88" stroke-width="1"/>
+        <text x="20" y="15" font-size="12">📊</text>
+        <text x="40" y="15" font-family="IBM Plex Mono" font-size="8" fill="#00ff88" font-weight="600">CARBON CODE METRICS</text>
+        <text x="200" y="15" font-family="IBM Plex Mono" font-size="8" fill="#4a6070">  kWh consumed · carbon saved · surplus captured · training efficiency</text>
+      </g>
+
+      <!-- ============================================================ -->
+      <!-- ANNOTATIONS -->
+      <!-- ============================================================ -->
+
+      <!-- Note on left for Claude runtime estimation -->
+      <rect x="50" y="565" width="270" height="22" rx="2" fill="rgba(167,139,250,0.05)" stroke="rgba(167,139,250,0.2)" stroke-width="0.5"/>
+      <text x="60" y="580" font-family="IBM Plex Mono" font-size="8" fill="#a78bfa">↑ Claude Code estimates runtime from code analysis</text>
+
+      <!-- Note: energy surplus window -->
+      <rect x="910" y="565" width="220" height="30" rx="2" fill="rgba(0,255,136,0.05)" stroke="rgba(0,255,136,0.2)" stroke-width="0.5"/>
+      <text x="920" y="578" font-family="IBM Plex Mono" font-size="8" fill="#00ff88">Deploy window = forecasted</text>
+      <text x="920" y="590" font-family="IBM Plex Mono" font-size="8" fill="#00ff88">energy surplus hours</text>
+
+      <!-- Line from ML panel to HW selector annotation -->
+      <line x1="910" y1="580" x2="870" y2="490" stroke="rgba(0,255,136,0.2)" stroke-width="0.5" stroke-dasharray="3 3"/>
+
+    </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 4: Market -->
+  <div class="slide" id="slide-4">
+    <div class="content-wrapper max-w-5xl">
+      <h2 class="text-[#00FF66] font-display text-sm tracking-[0.2em] uppercase mb-4">Market Size & Target</h2>
+      <h3 class="text-4xl font-bold mb-16 text-white">Capitalising on Flexible Compute</h3>
+      
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+        <div class="glass-panel p-10 rounded-2xl text-center border-[#00FF66]/30">
+          <div class="text-slate-400 text-lg font-medium mb-2">TAM</div>
+          <div class="hero-number text-5xl lg:text-6xl font-bold text-white mb-4">$8–12<span class="text-[#00FF66]">B</span></div>
+          <div class="text-sm text-slate-500 uppercase tracking-wide">Flexible GPU Training</div>
+        </div>
+        
+        <div class="glass-panel p-10 rounded-2xl text-center border-[#00FF66]/50 shadow-[0_0_30px_rgba(0,255,102,0.1)]">
+          <div class="text-slate-400 text-lg font-medium mb-2">SAM</div>
+          <div class="hero-number text-5xl lg:text-6xl font-bold text-white mb-4">$2.5–4.5<span class="text-[#00FF66]">B</span></div>
+          <div class="text-sm text-slate-500 uppercase tracking-wide">Non-Hyperscaler Buyers</div>
+        </div>
+
+        <div class="glass-panel p-10 rounded-2xl text-center border-[#00FF66] shadow-[0_0_40px_rgba(0,255,102,0.2)]">
+          <div class="text-[#00FF66] text-lg font-medium mb-2 text-glow">SOM</div>
+          <div class="hero-number text-5xl lg:text-6xl font-bold text-[#00FF66] mb-4 text-glow">$3–20<span class="text-white">M</span></div>
+          <div class="text-sm text-slate-400 uppercase tracking-wide">Capture in 3–5 Years</div>
+        </div>
+      </div>
+
+      <div class="text-center bg-white/5 inline-block px-8 py-4 rounded-full border border-white/10 mx-auto">
+        <p class="text-slate-300 text-lg">
+          <span class="text-white font-semibold">Primary Users:</span> Research Labs, Bootstrapped AI Startups, Indie Developers.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 5: Traction & Metrics -->
+  <div class="slide" id="slide-5">
+    <div class="content-wrapper max-w-6xl">
+      <h2 class="text-[#00FF66] font-display text-sm tracking-[0.2em] uppercase mb-4">Traction & Metrics</h2>
+      <h3 class="text-4xl font-bold mb-12 text-white">Proven Models, Tangible Impact</h3>
+      
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <div class="glass-panel p-8 rounded-2xl flex flex-col justify-between">
+          <i data-lucide="calendar-check" class="text-slate-500 mb-4 w-8 h-8"></i>
+          <div class="hero-number text-5xl font-bold text-white mb-2">95<span class="text-[#00FF66]">%</span></div>
+          <p class="text-slate-400 text-sm">Of the week features actionable routing windows.</p>
+        </div>
+
+        <div class="glass-panel p-8 rounded-2xl flex flex-col justify-between">
+          <i data-lucide="trending-down" class="text-slate-500 mb-4 w-8 h-8"></i>
+          <div class="hero-number text-5xl font-bold text-[#00FF66] mb-2 text-glow">48<span class="text-white">%</span></div>
+          <p class="text-slate-400 text-sm">Cost reduction for users tolerating scheduling delays.</p>
+        </div>
+
+        <div class="glass-panel p-8 rounded-2xl flex flex-col justify-between">
+          <i data-lucide="zap" class="text-slate-500 mb-4 w-8 h-8"></i>
+          <div class="hero-number text-5xl font-bold text-white mb-2">2.2<span class="text-xl text-[#00FF66] uppercase"> TWh</span></div>
+          <p class="text-slate-400 text-sm">France renewable surplus identifiable per week.</p>
+        </div>
+
+        <div class="glass-panel p-8 rounded-2xl flex flex-col justify-between">
+          <i data-lucide="target" class="text-slate-500 mb-4 w-8 h-8"></i>
+          <div class="hero-number text-5xl font-bold text-white mb-2">157<span class="text-xl text-[#00FF66] uppercase"> MW</span></div>
+          <p class="text-slate-400 text-sm">Finland ML Model MAE h+1 reliability baseline.</p>
+        </div>
+      </div>
+      
+      <div class="glass-panel w-full p-6 rounded-2xl text-center border-l-4 border-l-[#00FF66]">
+        <p class="text-xl text-slate-300">
+          Significantly lowers global footprint: <span class="text-white font-bold text-[#00FF66]">Net CO₂ negative</span> vs EU grid baseline.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 6: Ask -->
+  <div class="slide" id="slide-6">
+    <div class="content-wrapper text-center">
+      <div class="hero-number text-6xl md:text-8xl font-bold tracking-tight leading-tight text-white mb-12 space-y-4">
+        <div class="transform hover:scale-105 transition-transform duration-300">Cheaper compute.</div>
+        <div class="text-[#00FF66] text-glow transform hover:scale-105 transition-transform duration-300">Cleaner grid.</div>
+        <div class="text-slate-500 transform hover:scale-105 transition-transform duration-300">No config.</div>
+      </div>
+      
+      <div class="mt-20 inline-block border border-[#00FF66]/30 bg-[#00FF66]/5 px-8 py-4 rounded-full text-slate-300">
+        Contact us to join the private beta / seed round.
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <div class="nav-dots" id="dots-container"></div>
+  <div class="controls-hint">
+    <i data-lucide="mouse-pointer-click" class="w-4 h-4"></i> Click or Arrow Keys
+  </div>
+
+  <script>
+    // Initialize Lucide icons
+    lucide.createIcons();
+
+    const slides = document.querySelectorAll('.slide');
+    const dotsContainer = document.getElementById('dots-container');
+    let currentSlide = 0;
+
+    // Create dots
+    slides.forEach((_, index) => {
+      const dot = document.createElement('div');
+      dot.classList.add('dot');
+      if (index === 0) dot.classList.add('active');
+      dot.addEventListener('click', () => goToSlide(index));
+      dotsContainer.appendChild(dot);
+    });
+
+    const dots = document.querySelectorAll('.dot');
+
+    function goToSlide(index) {
+      slides[currentSlide].classList.remove('active');
+      dots[currentSlide].classList.remove('active');
+      
+      currentSlide = index;
+      
+      slides[currentSlide].classList.add('active');
+      dots[currentSlide].classList.add('active');
+    }
+
+    function nextSlide() {
+      if (currentSlide < slides.length - 1) {
+        goToSlide(currentSlide + 1);
+      }
+    }
+
+    function prevSlide() {
+      if (currentSlide > 0) {
+        goToSlide(currentSlide - 1);
+      }
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      // Ignore key events inside inputs/textareas
+      if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      
+      if (e.key === 'ArrowRight' || e.key === 'Space') {
+        nextSlide();
+      } else if (e.key === 'ArrowLeft') {
+        prevSlide();
+      }
+    });
+
+    // Click navigation (click anywhere on right side to go next, left side to go prev)
+    document.addEventListener('click', (e) => {
+      // Ignore clicks inside the chat widget, demo panel, or dots
+      if (e.target.closest('.dot') || e.target.closest('.ai-chat-widget') || e.target.closest('.demo-container')) return;
+      
+      const width = window.innerWidth;
+      if (e.clientX > width / 2) {
+        nextSlide();
+      } else {
+        prevSlide();
+      }
+    });
+
+    // --- GEMINI API INTEGRATION ---
+    const apiKey = ""; 
+
+    async function fetchGeminiWithRetry(systemPrompt, userText, retries = 5) {
+      const delays = [1000, 2000, 4000, 8000, 16000];
+      const payload = {
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ parts: [{ text: userText }] }],
+        generationConfig: { temperature: 0.2 }
+      };
+
+      for (let i = 0; i < retries; i++) {
+        try {
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+          
+          const result = await response.json();
+          return result.candidates?.[0]?.content?.parts?.[0]?.text || "Error parsing response.";
+        } catch (error) {
+          if (i === retries - 1) return `An error occurred connecting to the AI model after multiple retries.`;
+          await new Promise(res => setTimeout(res, delays[i]));
+        }
+      }
+    }
+
+    // --- Feature 1: Live Routing Demo ---
+    const btnDemoGenerate = document.getElementById('btn-demo-generate');
+    const demoPrompt = document.getElementById('demo-prompt');
+    const demoOutput = document.getElementById('demo-output');
+    const demoStatus = document.getElementById('demo-status');
+
+    if(btnDemoGenerate) {
+      btnDemoGenerate.addEventListener('click', async () => {
+        const userReq = demoPrompt.value.trim();
+        if (!userReq) return;
+
+        demoOutput.innerHTML = 'Routing engine analyzing request...<span class="typing-indicator">_</span>';
+        demoStatus.textContent = 'Contacting Gemini API...';
+        demoStatus.classList.add('text-yellow-400');
+        demoStatus.classList.remove('text-slate-500', 'text-[#00FF66]');
+
+        const systemPrompt = `You are the backend AI for a 'Green Compute Platform'. 
+        Take the user's plain text request for AI training (GPUs, hours, deadline) and output a JSON routing configuration.
+        The output must be realistic JSON for a job scheduler. Creatively assign the job to one of the 4 green countries (UK, France, Finland, Italy) based on hypothetical renewable energy surplus.
+        Include fields: "assigned_region", "scheduled_start_time_utc", "estimated_cost_usd", "co2_savings_kg", and "hardware_spec".
+        Return ONLY valid JSON. Do not include markdown blocks or any other text.`;
+
+        const aiResponse = await fetchGeminiWithRetry(systemPrompt, userReq);
+        
+        demoOutput.innerHTML = syntaxHighlightJSON(aiResponse.replace(/```json|```/g, '').trim());
+        demoStatus.textContent = 'Route optimized & generated.';
+        demoStatus.classList.remove('text-yellow-400');
+        demoStatus.classList.add('text-[#00FF66]');
+      });
+    }
+
+    function syntaxHighlightJSON(jsonStr) {
+        try {
+            const obj = JSON.parse(jsonStr);
+            const pretty = JSON.stringify(obj, null, 2);
+            return pretty.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        } catch(e) {
+            return jsonStr; // fallback
+        }
+    }
+
+    // --- Feature 2: Investor Q&A Chat Widget ---
+    const chatBtn = document.getElementById('ai-chat-btn');
+    const chatWindow = document.getElementById('ai-chat-window');
+    const closeChat = document.getElementById('close-chat');
+    const chatMessages = document.getElementById('ai-chat-messages');
+    const chatInput = document.getElementById('ai-chat-input');
+    const chatSubmit = document.getElementById('ai-chat-submit');
+    const controlsHint = document.getElementById('controls-hint');
+
+    const deckContext = `
+      Company: Green Compute Platform.
+      Problem: AI training is expensive, opaque, always-on, ignores the energy grid.
+      Solution: Intelligent, Carbon-Aware Routing. Users submit GitHub link + max wait time. ML forecasts grid gaps in UK, France, Finland, Italy. Routes job to cheapest green window. Deploys on AWS/Azure/GCP.
+      Market: TAM $8-12B (Flexible GPU Training), SAM $2.5-4.5B (Non-Hyperscalers like Universities, Startups, Indie devs), SOM $3-20M in 3-5 years.
+      Traction: Platform can route jobs 95% of the week. Finland MAE h+1 is 157MW. France surplus is 2,200 GWh/week. Up to 48% cost reduction. Net CO2 negative vs EU baseline.
+      Tone: Confident, data-driven, concise.
+    `;
+
+    function toggleChat() {
+      chatWindow.classList.toggle('open');
+      if(chatWindow.classList.contains('open')) {
+          if(controlsHint) controlsHint.style.display = 'none';
+          chatInput.focus();
+      } else {
+          if(controlsHint) controlsHint.style.display = 'flex';
+      }
+    }
+
+    if(chatBtn) chatBtn.addEventListener('click', toggleChat);
+    if(closeChat) closeChat.addEventListener('click', toggleChat);
+
+    async function handleChatSubmit() {
+      const text = chatInput.value.trim();
+      if (!text) return;
+
+      addMessage(text, 'user');
+      chatInput.value = '';
+
+      const typingId = addMessage('...', 'bot');
+
+      const systemPrompt = `You are the AI proxy for the founders of Green Compute Platform. 
+      Answer investor questions using ONLY the following context about your pitch deck:
+      ${deckContext}
+      Keep your answers brief, professional, and directly address the investor's question. If the answer isn't in the context, politely state that you can discuss it during the Q&A or follow up via email.`;
+
+      const aiResponse = await fetchGeminiWithRetry(systemPrompt, text);
+      
+      const botMsgEl = document.getElementById(typingId);
+      if(botMsgEl) {
+          botMsgEl.textContent = aiResponse;
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+    }
+
+    if(chatSubmit) chatSubmit.addEventListener('click', handleChatSubmit);
+    if(chatInput) chatInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') handleChatSubmit();
+    });
+
+    function addMessage(text, sender) {
+      const msg = document.createElement('div');
+      msg.className = `message ${sender}`;
+      msg.textContent = text;
+      const id = 'msg-' + Date.now();
+      msg.id = id;
+      chatMessages.appendChild(msg);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      return id;
+    }
+  </script>
+</body>
+</html>
