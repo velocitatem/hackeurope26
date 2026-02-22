@@ -34,14 +34,19 @@ services:
       - SCHEDULING_MODE=${SCHEDULING_MODE:-prepared}
       - RAILS_API_URL=${RAILS_API_URL:-http://rails:3001}
       - OPENSHIFT_NAMESPACE=${OPENSHIFT_NAMESPACE:-drosel-ieu2022-dev}
-      - KUBECONFIG=/kube/config
+      - KUBECONFIG=/home/app/.kube/config
       - OPENSHIFT_AUTH_REQUIRED=${OPENSHIFT_AUTH_REQUIRED:-true}
+      - IMAGE_BUILD_MODE=${IMAGE_BUILD_MODE:-openshift_binary}
+      - OPENSHIFT_IMAGESTREAM_NAME=${OPENSHIFT_IMAGESTREAM_NAME:-hackeurope-train}
+      - OPENSHIFT_BUILDCONFIG_PREFIX=${OPENSHIFT_BUILDCONFIG_PREFIX:-repo-train}
+      - REQUIRE_IMAGE_BUILD=${REQUIRE_IMAGE_BUILD:-true}
       - DISABLE_GPU_REQUESTS=${DISABLE_GPU_REQUESTS:-true}
       - PREPARED_SCHEDULER_NAME=${PREPARED_SCHEDULER_NAME:-default-scheduler}
       - PREPARED_APPLY_NODE_SELECTOR=${PREPARED_APPLY_NODE_SELECTOR:-false}
+      - JOB_IMAGE_PULL_POLICY=${JOB_IMAGE_PULL_POLICY:-IfNotPresent}
     volumes:
       - ./.env:/app/.env
-      - ${KUBECONFIG_PATH:-/home/velocitatem/.kube/config}:/kube/config:ro
+      - ${KUBECONFIG_PATH:-/home/velocitatem/.kube/config}:/home/app/.kube/config:ro
     depends_on:
       - redis
     restart: unless-stopped
@@ -55,6 +60,8 @@ services:
       - REDIS_URL=redis://redis:6379
       - BACKEND_PORT=8000
       - PYTHONPATH=/app
+      - OPENSHIFT_NAMESPACE=${OPENSHIFT_NAMESPACE:-drosel-ieu2022-dev}
+      - OPENSHIFT_IMAGESTREAM_NAME=${OPENSHIFT_IMAGESTREAM_NAME:-hackeurope-train}
     ports:
       - "${BACKEND_PORT:-9812}:8000"
     volumes:

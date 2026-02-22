@@ -80,8 +80,18 @@ def _read_job(job_id: str) -> dict[str, object] | None:
 
 
 def _suggest_image(job_id: str) -> str:
-    repo = os.getenv("DEFAULT_IMAGE_REPO", "quay.io/drosel_ieu2022/hackeurope-train")
-    return f"{repo}:{job_id}"
+    repo = os.getenv("DEFAULT_IMAGE_REPO", "").strip()
+    if repo:
+        return f"{repo}:{job_id}"
+
+    namespace = os.getenv("OPENSHIFT_NAMESPACE", "drosel-ieu2022-dev").strip()
+    image_stream = os.getenv("OPENSHIFT_IMAGESTREAM_NAME", "hackeurope-train").strip()
+    if not image_stream:
+        image_stream = "hackeurope-train"
+    return (
+        "image-registry.openshift-image-registry.svc:5000/"
+        f"{namespace}/{image_stream}:{job_id}"
+    )
 
 
 def _estimate_job_spec(job_id: str, job: dict[str, object]) -> dict[str, object] | None:

@@ -66,6 +66,9 @@ def _resolve_redis_url() -> str:
 
 REDIS_URL = _resolve_redis_url()
 SCHEDULING_MODE = os.getenv("SCHEDULING_MODE", "prepared").strip().lower()
+if SCHEDULING_MODE not in {"prepared", "admission"}:
+    log.warning("invalid SCHEDULING_MODE=%s; falling back to prepared", SCHEDULING_MODE)
+    SCHEDULING_MODE = "prepared"
 app = Celery("worker", broker=REDIS_URL, backend=REDIS_URL)
 
 
@@ -161,7 +164,7 @@ class AgentAutonomyResult(BaseModel):
 
 
 READ_ONLY_AGENT_TOOLS = ["Read", "Glob", "Grep"]
-CODE_AGENT_TOOLS = ["Read", "Glob", "Grep", "Edit", "Write", "Bash"]
+CODE_AGENT_BASE_TOOLS = ["Read", "Glob", "Grep", "Edit", "Write"]
 
 
 def _redis() -> redis.Redis:
@@ -310,16 +313,45 @@ def _env_flag(name: str, default: bool = False) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _effective_gpu_count(requested: int) -> int:
-    override_raw = os.getenv("GPU_COUNT_OVERRIDE", "").strip()
-    if override_raw:
-        try:
-            return max(0, int(override_raw))
-        except Exception:
-            pass
+def _code_agent_tools() -> list[str]:
+    tools = list(CODE_AGENT_BASE_TOOLS)
+    if _env_flag("ENABLE_AGENT_BASH_TOOL", default=False):
+        tools.append("Bash")
+    return tools
+
+
+def _sanitize_k8s_name(value: str, fallback: str = "train") -> str:
+    safe = re.sub(r"[^a-z0-9-]", "-", value.lower())
+    safe = re.sub(r"-+", "-", safe).strip("-")
+    return safe or fallback
+
+
+def _effective_gpu_count(gpu_count: int) -> int:
     if _env_flag("DISABLE_GPU_REQUESTS", default=False):
         return 0
-    return max(0, int(requested))
+
+    for env_name in ("GPU_REQUEST_COUNT", "GPU_COUNT_OVERRIDE"):
+        override = os.getenv(env_name)
+        if override is None or not override.strip():
+            continue
+        try:
+            return max(0, int(override.strip()))
+        except Exception:
+            continue
+
+    return max(0, int(gpu_count))
+
+
+def _openshift_internal_image(
+    *,
+    namespace: str,
+    image_stream: str,
+    image_tag: str,
+) -> str:
+    return (
+        "image-registry.openshift-image-registry.svc:5000/"
+        f"{namespace}/{image_stream}:{image_tag}"
+    )
 
 
 def _extract_content_text(content: object) -> str | None:
@@ -533,7 +565,10 @@ def _ensure_dockerfile_with_entrypoint(
     if path.exists():
         text = path.read_text(encoding="utf-8")
         if _dockerfile_has_entrypoint_or_cmd(text):
-            return rel
+            try:
+                return str(path.relative_to(repo_dir))
+            except ValueError:
+                return rel
 
     if training_command:
         cmd = json.dumps(training_command)
@@ -548,7 +583,10 @@ def _ensure_dockerfile_with_entrypoint(
         fallback = _default_dockerfile(analysis)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(fallback, encoding="utf-8")
-    return rel
+    try:
+        return str(path.relative_to(repo_dir))
+    except ValueError:
+        return rel
 
 
 def _resolve_container_builder() -> str | None:
@@ -601,12 +639,165 @@ def _build_container_image(
     }
 
 
+def _resolve_oc_path() -> str | None:
+    return shutil.which("oc")
+
+
+def _run_oc(
+    args: list[str],
+    *,
+    timeout_s: int,
+    cwd: str | None = None,
+    stdin_text: str | None = None,
+) -> subprocess.CompletedProcess[str]:
+    oc_path = _resolve_oc_path()
+    if not oc_path:
+        raise RuntimeError("oc CLI not available in worker runtime")
+
+    command = [oc_path, *args]
+    return subprocess.run(
+        command,
+        cwd=cwd,
+        input=stdin_text,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=max(60, timeout_s),
+    )
+
+
+def _build_openshift_binary_image(
+    *,
+    repo_dir: Path,
+    namespace: str,
+    job_id: str,
+    dockerfile_path: str,
+    timeout_s: int,
+) -> dict[str, Any]:
+    image_stream = (
+        os.getenv("OPENSHIFT_IMAGESTREAM_NAME", "hackeurope-train").strip()
+        or "hackeurope-train"
+    )
+    build_prefix = (
+        os.getenv("OPENSHIFT_BUILDCONFIG_PREFIX", "repo-train").strip() or "repo-train"
+    )
+
+    safe_job = _sanitize_k8s_name(job_id, fallback="job")
+    image_tag = safe_job[:63]
+    bc_name = _sanitize_k8s_name(f"{build_prefix}-{safe_job}", fallback="repo-train")[
+        :63
+    ]
+
+    internal_image = _openshift_internal_image(
+        namespace=namespace,
+        image_stream=image_stream,
+        image_tag=image_tag,
+    )
+
+    get_is = _run_oc(
+        ["-n", namespace, "get", "imagestream", image_stream], timeout_s=60
+    )
+    if get_is.returncode != 0:
+        create_is = _run_oc(
+            ["-n", namespace, "create", "imagestream", image_stream],
+            timeout_s=60,
+        )
+        if create_is.returncode != 0:
+            raise RuntimeError(
+                "failed to create ImageStream "
+                f"{image_stream}; stderr={_preview_text(create_is.stderr or '', 500)}"
+            )
+
+    # Ensure dockerfile_path is relative for OpenShift BuildConfig
+    if Path(dockerfile_path).is_absolute():
+        try:
+            dockerfile_path = str(Path(dockerfile_path).relative_to(repo_dir))
+        except ValueError:
+            # Fallback: if it's absolute but not in repo_dir, we can't easily fix it
+            # ensuring it's relative is critical.
+            # However, usually it IS in repo_dir, just passed as absolute.
+            pass
+
+    build_config = {
+        "apiVersion": "build.openshift.io/v1",
+        "kind": "BuildConfig",
+        "metadata": {"name": bc_name, "namespace": namespace},
+        "spec": {
+            "runPolicy": "Serial",
+            "source": {"type": "Binary"},
+            "strategy": {
+                "type": "Docker",
+                "dockerStrategy": {
+                    "dockerfilePath": dockerfile_path,
+                    "noCache": True,
+                },
+            },
+            "output": {
+                "to": {
+                    "kind": "ImageStreamTag",
+                    "name": f"{image_stream}:{image_tag}",
+                }
+            },
+            "triggers": [],
+        },
+    }
+    apply_build_config = _run_oc(
+        ["-n", namespace, "apply", "-f", "-"],
+        timeout_s=60,
+        stdin_text=json.dumps(build_config),
+    )
+    if apply_build_config.returncode != 0:
+        raise RuntimeError(
+            f"failed to apply BuildConfig {bc_name}; "
+            f"stderr={_preview_text(apply_build_config.stderr or '', 500)}"
+        )
+
+    start_build = _run_oc(
+        [
+            "-n",
+            namespace,
+            "start-build",
+            bc_name,
+            f"--from-dir={str(repo_dir)}",
+            "--follow",
+            "--wait",
+            "--build-loglevel=2",
+        ],
+        timeout_s=timeout_s,
+    )
+    if start_build.returncode != 0:
+        raise RuntimeError(
+            f"OpenShift binary build failed for {bc_name}; "
+            f"stderr={_preview_text(start_build.stderr or '', 500)} "
+            f"stdout={_preview_text(start_build.stdout or '', 500)}"
+        )
+
+    build_name_match = re.search(
+        r"build\.build\.openshift\.io/([a-z0-9-]+)",
+        (start_build.stdout or "") + "\n" + (start_build.stderr or ""),
+    )
+    build_name = build_name_match.group(1) if build_name_match else ""
+
+    return {
+        "builder": "openshift-binary",
+        "namespace": namespace,
+        "build_config": bc_name,
+        "build_name": build_name,
+        "image_stream": image_stream,
+        "image_tag": image_tag,
+        "image": internal_image,
+        "stdout_preview": _preview_text(start_build.stdout or "", 500),
+    }
+
+
 def _parse_analysis(raw: str) -> RepoAnalysis:
     data = json.loads(_strip_code_fence(raw))
     return RepoAnalysis.model_validate(data)
 
 
 def _docker_base(framework: str) -> str:
+    if _env_flag("DISABLE_GPU_REQUESTS", default=False):
+        return "python:3.11-slim"
     if framework in {"pytorch", "huggingface"}:
         return "pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime"
     if framework == "tensorflow":
@@ -703,13 +894,13 @@ def _schedule_with_rails(
     base_url = os.getenv("RAILS_API_URL", "http://rails-control-plane:3001").rstrip("/")
     url = f"{base_url}/webhook/pods"
     duration_s = max(3600, int(analysis.estimated_hours * 3600))
-    gpu_count = _effective_gpu_count(analysis.gpu_count)
+    effective_gpu = _effective_gpu_count(analysis.gpu_count)
 
     annotations: dict[str, str] = {
         "energy.io/duration-s": str(duration_s),
         "energy.io/allowed-geos": ",".join(allowed_geos),
     }
-    if gpu_count > 0:
+    if effective_gpu > 0:
         annotations["energy.io/min-gpu-memory-mib"] = str(
             max(1024, analysis.gpu_mem_gib * 1024)
         )
@@ -734,7 +925,7 @@ def _schedule_with_rails(
                             "name": "trainer",
                             "resources": {
                                 "limits": {
-                                    "nvidia.com/gpu": gpu_count,
+                                    "nvidia.com/gpu": effective_gpu,
                                 }
                             },
                         }
@@ -781,7 +972,6 @@ def _dispatch_job_to_openshift(
 ) -> dict[str, Any]:
     name = _job_name(job_id)
     auth_required = _env_flag("OPENSHIFT_AUTH_REQUIRED", default=False)
-    gpu_count = _effective_gpu_count(analysis.gpu_count)
 
     try:
         from kubernetes import client as k8s_client
@@ -836,14 +1026,17 @@ def _dispatch_job_to_openshift(
         "energy-scheduling": "true",
     }
 
+    effective_gpu = _effective_gpu_count(analysis.gpu_count)
+
     # -- Annotations (base) --
     duration_s = max(3600, int(analysis.estimated_hours * 3600))
     annotations: dict[str, str] = {
         "energy.io/duration-s": str(duration_s),
+        "energy.io/effective-gpu-count": str(effective_gpu),
         "energy.io/allowed-geos": ",".join(allowed_geos or ["FR", "DE", "ES"]),
         "energy.io/decision-source": scheduling_mode,
     }
-    if gpu_count > 0:
+    if effective_gpu > 0:
         annotations["energy.io/min-gpu-memory-mib"] = str(
             max(1024, analysis.gpu_mem_gib * 1024)
         )
@@ -852,12 +1045,10 @@ def _dispatch_job_to_openshift(
 
     # -- Scheduling decision fields (prepared mode bakes them in) --
     node_selector: dict[str, str] | None = None
-    scheduler_name = "default-scheduler"
-    prepared_scheduler_name = (
-        os.getenv("PREPARED_SCHEDULER_NAME", "secondary-scheduler").strip()
-        or "default-scheduler"
-    )
-    apply_prepared_selector = _env_flag("PREPARED_APPLY_NODE_SELECTOR", default=True)
+    scheduler_name = os.getenv("PREPARED_SCHEDULER_NAME", "default-scheduler").strip()
+    if not scheduler_name:
+        scheduler_name = "default-scheduler"
+    apply_node_selector = _env_flag("PREPARED_APPLY_NODE_SELECTOR", default=False)
 
     if isinstance(decision, dict):
         # Propagate decision into annotations
@@ -877,13 +1068,12 @@ def _dispatch_job_to_openshift(
 
         # In prepared mode, set nodeSelector and schedulerName directly
         if scheduling_mode == "prepared":
-            scheduler_name = prepared_scheduler_name
             selector: dict[str, str] = {}
             for sel_key in ("geo", "provider", "region", "sku"):
                 sel_val = str(decision.get(sel_key, "")).strip()
                 if sel_val:
                     selector[f"energy.io/{sel_key}"] = sel_val
-            if selector and apply_prepared_selector:
+            if selector and apply_node_selector:
                 node_selector = selector
 
     # -- Env vars --
@@ -922,7 +1112,7 @@ def _dispatch_job_to_openshift(
             limits={
                 "cpu": "2",
                 "memory": "4Gi",
-                **({"nvidia.com/gpu": gpu_count} if gpu_count > 0 else {}),
+                **({"nvidia.com/gpu": effective_gpu} if effective_gpu > 0 else {}),
             },
         ),
     )
@@ -974,6 +1164,8 @@ def _dispatch_job_to_openshift(
         "dispatched": True,
         "mode": "openshift",
         "scheduling_mode": scheduling_mode,
+        "effective_gpu_count": effective_gpu,
+        "node_selector_applied": bool(node_selector),
         "auth_mode": auth_mode,
     }
 
@@ -992,6 +1184,141 @@ def _analyze_from_vfs(job_id: str, timeout: int, verbose: bool) -> RepoAnalysis:
     return _parse_analysis(raw)
 
 
+def _detect_framework_from_repo(repo_dir: Path) -> str:
+    requirements_text = ""
+    req_file = repo_dir / "requirements.txt"
+    if req_file.exists():
+        try:
+            requirements_text = req_file.read_text(encoding="utf-8").lower()
+        except Exception:
+            requirements_text = ""
+
+    if "torch" in requirements_text or "pytorch" in requirements_text:
+        return "pytorch"
+    if "tensorflow" in requirements_text:
+        return "tensorflow"
+
+    for candidate in repo_dir.rglob("*.py"):
+        rel = candidate.relative_to(repo_dir).as_posix()
+        if rel.startswith((".git/", "venv/", ".venv/", "__pycache__/")):
+            continue
+        try:
+            text = candidate.read_text(encoding="utf-8").lower()
+        except Exception:
+            continue
+        if "import torch" in text or "from torch" in text:
+            return "pytorch"
+        if "import tensorflow" in text or "from tensorflow" in text:
+            return "tensorflow"
+    return "python"
+
+
+def _guess_entrypoint(repo_dir: Path) -> str:
+    explicit_candidates = [
+        "train.py",
+        "main.py",
+        "mnist.py",
+        "src/train.py",
+        "src/main.py",
+    ]
+    for rel in explicit_candidates:
+        if (repo_dir / rel).exists():
+            return rel
+
+    trainish: list[str] = []
+    all_py: list[str] = []
+    for candidate in sorted(repo_dir.rglob("*.py")):
+        rel = candidate.relative_to(repo_dir).as_posix()
+        if rel.startswith((".git/", "venv/", ".venv/", "tests/", "test/")):
+            continue
+        all_py.append(rel)
+        if "train" in candidate.stem.lower() or "mnist" in candidate.stem.lower():
+            trainish.append(rel)
+
+    if trainish:
+        return trainish[0]
+    if all_py:
+        return all_py[0]
+    return "train.py"
+
+
+def _ensure_codecarbon_requirements(repo_dir: Path) -> list[str]:
+    requirements_path = repo_dir / "requirements.txt"
+    if requirements_path.exists():
+        try:
+            content = requirements_path.read_text(encoding="utf-8")
+        except Exception:
+            content = ""
+        lines = content.splitlines()
+        if not any("codecarbon" in line.lower() for line in lines):
+            if content and not content.endswith("\n"):
+                content += "\n"
+            content += "codecarbon>=2.8.0\n"
+            requirements_path.write_text(content, encoding="utf-8")
+    else:
+        requirements_path.write_text("codecarbon>=2.8.0\n", encoding="utf-8")
+    return ["codecarbon>=2.8.0"]
+
+
+def _heuristic_autonomy_prepare(repo_dir: Path, job_id: str) -> AgentAutonomyResult:
+    entrypoint = _guess_entrypoint(repo_dir)
+    dependencies = _ensure_codecarbon_requirements(repo_dir)
+    framework = _detect_framework_from_repo(repo_dir)
+    gpu_count = 1 if framework in {"pytorch", "tensorflow", "jax", "huggingface"} else 0
+
+    wrapper_path = repo_dir / "codecarbon_wrapper.py"
+    wrapper_path.write_text(
+        (
+            "from __future__ import annotations\n\n"
+            "import os\n"
+            "import subprocess\n"
+            "import sys\n\n"
+            "from codecarbon import EmissionsTracker\n\n"
+            "def main() -> int:\n"
+            "    cmd = sys.argv[1:]\n"
+            f"    if not cmd:\n        cmd = ['python', '{entrypoint}']\n"
+            "    tracker = EmissionsTracker(\n"
+            "        project_name=os.getenv('JOB_ID', 'training-job'),\n"
+            "        output_dir=os.getenv('CODECARBON_OUTPUT_DIR', '/tmp'),\n"
+            "    )\n"
+            "    tracker.start()\n"
+            "    try:\n"
+            "        return subprocess.call(cmd)\n"
+            "    finally:\n"
+            "        tracker.stop()\n\n"
+            "if __name__ == '__main__':\n"
+            "    raise SystemExit(main())\n"
+        ),
+        encoding="utf-8",
+    )
+
+    return AgentAutonomyResult(
+        framework=framework,
+        entrypoint=entrypoint,
+        gpu_count=gpu_count,
+        gpu_mem_gib=16,
+        estimated_hours=1.0,
+        requires_dockerfile=True,
+        dependencies=dependencies,
+        notes=(
+            "Heuristic CodeCarbon preparation path used because ANTHROPIC_API_KEY "
+            "was not configured in the worker runtime."
+        ),
+        dockerfile_path="Dockerfile",
+        training_command=["python", "codecarbon_wrapper.py", "python", entrypoint],
+        codecarbon_summary=(
+            "Added codecarbon_wrapper.py and requirements.txt update; wrapper tracks "
+            "emissions around training command execution."
+        ),
+    )
+
+
+def _agent_auth_configured() -> bool:
+    api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+    auth_token = os.getenv("ANTHROPIC_AUTH_TOKEN", "").strip()
+    return bool(api_key or auth_token)
+
+
 def _autonomous_prepare_repo(
     *,
     repo_dir: Path,
@@ -1002,17 +1329,37 @@ def _autonomous_prepare_repo(
 ) -> tuple[RepoAnalysis, str, str, list[str], dict[str, Any], str]:
     before_files = _collect_text_files(repo_dir)
     prompt = _build_autonomous_code_prompt(job_id=job_id, selected_image=selected_image)
-    raw = asyncio.run(
-        _run_agent(
-            prompt,
-            timeout=max(timeout, 300),
-            verbose=verbose,
-            allowed_tools=CODE_AGENT_TOOLS,
-            cwd=str(repo_dir),
-            max_turns=60,
+    allow_heuristic = _env_flag("ALLOW_HEURISTIC_FALLBACK", default=False)
+    try:
+        raw = asyncio.run(
+            _run_agent(
+                prompt,
+                timeout=max(timeout, 300),
+                verbose=verbose,
+                allowed_tools=_code_agent_tools(),
+                cwd=str(repo_dir),
+                max_turns=60,
+            )
         )
-    )
-    autonomy = _parse_autonomous_result(raw)
+        autonomy = _parse_autonomous_result(raw)
+    except Exception as exc:
+        if not allow_heuristic:
+            if not _agent_auth_configured():
+                raise RuntimeError(
+                    "agent prepare failed and no agent auth is configured. "
+                    "Set ANTHROPIC_AUTH_TOKEN (or ANTHROPIC_API_KEY)."
+                ) from exc
+            raise RuntimeError(
+                f"agent prepare failed with heuristic fallback disabled: {exc}"
+            ) from exc
+
+        log.warning(
+            "autonomous prepare failed for %s, using heuristic fallback: %s",
+            job_id,
+            exc,
+        )
+        autonomy = _heuristic_autonomy_prepare(repo_dir=repo_dir, job_id=job_id)
+
     analysis = RepoAnalysis(
         framework=autonomy.framework,
         entrypoint=autonomy.entrypoint,
@@ -1087,12 +1434,26 @@ def generate_manifest(self, payload: dict[str, Any]) -> dict[str, Any]:
 )
 def deploy_from_github(self, payload: dict[str, Any]) -> dict[str, Any]:
     inp = RepoSubmitPayload.model_validate(payload)
+    namespace = os.getenv("OPENSHIFT_NAMESPACE", "drosel-ieu2022-dev").strip()
+    build_mode = os.getenv("IMAGE_BUILD_MODE", "openshift_binary").strip().lower()
     selected_image = inp.image or os.getenv("DEFAULT_TRAINING_IMAGE", "").strip()
     if not selected_image:
-        image_repo = os.getenv(
-            "DEFAULT_IMAGE_REPO", "quay.io/drosel_ieu2022/hackeurope-train"
-        ).strip()
-        selected_image = f"{image_repo}:{inp.job_id}"
+        default_repo = os.getenv("DEFAULT_IMAGE_REPO", "").strip()
+        if default_repo:
+            selected_image = f"{default_repo}:{inp.job_id}"
+        elif build_mode in {"openshift", "openshift_binary"}:
+            image_stream = (
+                os.getenv("OPENSHIFT_IMAGESTREAM_NAME", "hackeurope-train").strip()
+                or "hackeurope-train"
+            )
+            selected_image = _openshift_internal_image(
+                namespace=namespace,
+                image_stream=image_stream,
+                image_tag=_sanitize_k8s_name(inp.job_id, fallback="job")[:63],
+            )
+        else:
+            image_repo = "quay.io/drosel_ieu2022/hackeurope-train"
+            selected_image = f"{image_repo}:{inp.job_id}"
     _update_job(
         inp.job_id,
         status="queued",
@@ -1137,12 +1498,24 @@ def deploy_from_github(self, payload: dict[str, Any]) -> dict[str, Any]:
             build_result: dict[str, Any] = {}
             image_build_error = ""
             try:
-                build_result = _build_container_image(
-                    repo_dir=repo_dir,
-                    image_tag=selected_image,
-                    dockerfile_path=dockerfile_path,
-                    timeout_s=max(inp.timeout, 300),
-                )
+                if build_mode in {"openshift", "openshift_binary"}:
+                    build_result = _build_openshift_binary_image(
+                        repo_dir=repo_dir,
+                        namespace=namespace,
+                        job_id=inp.job_id,
+                        dockerfile_path=dockerfile_path,
+                        timeout_s=max(inp.timeout, 1800),
+                    )
+                    built_image = str(build_result.get("image") or "").strip()
+                    if built_image:
+                        selected_image = built_image
+                else:
+                    build_result = _build_container_image(
+                        repo_dir=repo_dir,
+                        image_tag=selected_image,
+                        dockerfile_path=dockerfile_path,
+                        timeout_s=max(inp.timeout, 300),
+                    )
             except Exception as exc:
                 image_build_error = str(exc)
                 if os.getenv("REQUIRE_IMAGE_BUILD", "false").strip().lower() in {
