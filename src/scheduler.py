@@ -6,6 +6,7 @@ from typing import Callable
 
 from src import config
 from src.models import InventoryNode, JobSpec, SchedulingDecision
+from src.providers import EnergyProvider, InventoryProvider
 from src.signals import (
     EnergyClient,
     InventoryClient,
@@ -147,12 +148,17 @@ def migration_worthwhile(
 
 
 class Scheduler:
-    """Energy-aware job scheduler using pure function composition."""
+    """Energy-aware job scheduler using pure function composition.
+
+    Accepts any objects satisfying EnergyProvider and InventoryProvider protocols,
+    so custom providers (MLFlow experiment trackers, WANDB, etc.) can plug in without
+    subclassing EnergyClient or InventoryClient.
+    """
 
     def __init__(
         self,
-        energy: EnergyClient,
-        inventory: InventoryClient,
+        energy: EnergyProvider,
+        inventory: InventoryProvider,
         dispatch_callback: DispatchCallback | None = None,
         warm_start_callback: WarmStartCallback | None = None,
     ):
